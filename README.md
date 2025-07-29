@@ -25,7 +25,7 @@ The application features a two-level access system:
 
 *   **Admin Access:**
     *   **Username:** `rpakzad@taraazresearch.org`
-    *   **Password:** `AdminLevel@taraaz`
+    *   **Password:** `
     *   **Permissions:** Admins can view all evaluations submitted by all users and download a complete CSV of all data.
 
 *   **Evaluator Access:**
