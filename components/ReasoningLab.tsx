@@ -419,6 +419,28 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     }
   };
   
+  const handleDeleteEvaluation = (evaluationId: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this evaluation? This action cannot be undone.")) {
+      return;
+    }
+
+    // This component's state only knows about reasoning evaluations, so we update it directly.
+    const updatedReasoningEvaluations = allEvaluations.filter(ev => ev.id !== evaluationId);
+    setAllEvaluations(updatedReasoningEvaluations);
+
+    // For localStorage, we must load ALL evaluations, filter, and save back
+    // to avoid deleting evaluations from other labs.
+    try {
+      const allStoredEvaluations = loadEvaluationsFromStorage();
+      const evaluationsToKeep = allStoredEvaluations.filter(ev => ev.id !== evaluationId);
+      localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(evaluationsToKeep));
+      alert("Evaluation deleted successfully.");
+    } catch (e) {
+      console.error("Failed to delete evaluation from localStorage:", e);
+      alert("Error: Could not delete the evaluation from storage.");
+    }
+  };
+
   const isRunExperimentDisabled = () => {
     if (isLoading || cooldown > 0 || isTranslating) return true;
     const modelInfo = AVAILABLE_MODELS.find(m => m.id === selectedModel);
@@ -791,7 +813,21 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                             ))}
                         </div>
                         {ev.notes && <div className="mt-6"><h4 className="text-lg font-semibold text-primary mb-2 pb-1 border-b border-border/70">C. Overall Notes & Impact Summary</h4><p className="italic bg-muted p-4 rounded-md text-sm leading-relaxed max-h-48 overflow-y-auto custom-scrollbar" tabIndex={0}>{ev.notes}</p></div>}
-                        <div className="mt-6 flex justify-end pt-4 border-t border-border/50"><button onClick={() => handleToggleFlagForReview(ev.id)} className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 ${ev.isFlaggedForReview ? 'bg-destructive/80 text-destructive-foreground hover:bg-destructive' : 'bg-secondary text-secondary-foreground hover:bg-muted'}`} aria-label={ev.isFlaggedForReview ? 'Unflag this evaluation' : 'Flag this evaluation for admin review'}>{ev.isFlaggedForReview ? '🚩 Unflag ' : 'Flag for Review'}</button></div>
+                        <div className="mt-6 flex justify-between items-center pt-4 border-t border-border/50">
+                            <button
+                                onClick={() => handleDeleteEvaluation(ev.id)}
+                                className="px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 text-destructive hover:bg-destructive/10"
+                                aria-label="Delete this evaluation"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                    <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 01-8.832 0v-.227a3 3 0 013-3h2.666a3 3 0 013 3zM3.5 6A1.5 1.5 0 002 7.5v9A1.5 1.5 0 003.5 18h13a1.5 1.5 0 001.5-1.5v-9A1.5 1.5 0 0016.5 6h-13zM8 10a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 10zm4 0a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0112 10z" clipRule="evenodd" />
+                                </svg>
+                                <span>Delete Evaluation</span>
+                            </button>
+                            <button onClick={() => handleToggleFlagForReview(ev.id)} className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 ${ev.isFlaggedForReview ? 'bg-destructive/80 text-destructive-foreground hover:bg-destructive' : 'bg-secondary text-secondary-foreground hover:bg-muted'}`} aria-label={ev.isFlaggedForReview ? 'Unflag this evaluation' : 'Flag this evaluation for admin review'}>
+                                {ev.isFlaggedForReview ? '🚩 Unflag' : 'Flag for Review'}
+                            </button>
+                        </div>
                       </div>
                     </details>
                   ))}
