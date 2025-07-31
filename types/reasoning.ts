@@ -28,6 +28,7 @@ export interface ReasoningEvaluationRecord {
   reasoningWordCountA: number;
   answerWordCountA: number;
   generationTimeSecondsA?: number;
+  wordsPerSecondA?: number;
 
   // Column B Data
   titleB: string;
@@ -39,6 +40,7 @@ export interface ReasoningEvaluationRecord {
   reasoningWordCountB: number;
   answerWordCountB: number;
   generationTimeSecondsB?: number;
+  wordsPerSecondB?: number;
 
   // Evaluation
   scores: {
