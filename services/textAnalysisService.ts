@@ -1,3 +1,4 @@
+
 import { ExtractedEntities } from '../types';
 
 // Helper function to convert Eastern Arabic numerals (used in Persian, Urdu, etc.) 
@@ -17,14 +18,66 @@ const URL_REGEX = /\b((?:https?:\/\/|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(
 // Regex for Email Addresses (common pattern)
 const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/g;
 
-// Regex for Phone Numbers (more comprehensive, tries to catch various international formats, requires at least 7 digits to reduce false positives)
+// Regex for Phone Numbers (more comprehensive, tries to catch various international formats). Post-processing is used to ensure at least 7 digits.
 // Runs on text with normalized digits.
 const PHONE_REGEX = /(?:\+?\d{1,4}[\s.-]?)?(?:\(\d{1,5}\)[\s.-]?)?[\d\s.-]{7,}\d/g;
+
+/**
+ * A dictionary of humanitarian organizations and their common names/acronyms across different languages.
+ * This is used for automatic entity recognition.
+ */
+const orgDictionary = [
+    { acronym: 'UNHCR', names: { en: ['United Nations High Commissioner for Refugees', 'UN Refugee Agency'], fa: ['کمیساریای عالی سازمان ملل برای پناهندگان', 'آژانس پناهندگان سازمان ملل'] } },
+    { acronym: 'MSF', names: { en: ["Doctors Without Borders"], fr: ["Médecins Sans Frontières"], fa: ["پزشکان بدون مرز"] } },
+    { acronym: 'IOM', names: { en: ["International Organization for Migration"], fa: ["سازمان بین المللی مهاجرت"] } },
+    { acronym: 'ICRC', names: { en: ["International Committee of the Red Cross"], fa: ["کمیته بین المللی صلیب سرخ"] } },
+    { acronym: 'WFP', names: { en: ["World Food Programme"], fa: ["برنامه جهانی غذا"] } },
+    { acronym: 'UNICEF', names: { en: ["United Nations Children's Fund"], fa: ["صندوق کودکان سازمان ملل متحد"] } },
+];
+
+/**
+ * Extracts known organizations and general acronyms from text.
+ * @param text The source text to analyze.
+ * @param langCode The BCP-47 language code of the text (e.g., 'en', 'fa').
+ * @returns An array of unique potential organization/acronym strings.
+ */
+const extractOrganizationsAndAcronyms = (text: string, langCode: string = 'en'): string[] => {
+    const lang = langCode.split('-')[0]; // Use base language code (e.g., 'en' from 'en-US')
+    const foundEntities = new Set<string>();
+
+    // 1. Find entities from the dictionary
+    orgDictionary.forEach(org => {
+        // Regex for the acronym, allowing for dots (e.g., U.N.H.C.R.)
+        const acronymRegex = new RegExp(`\\b${org.acronym.split('').join('\\.?')}\\b`, 'gi');
+        (text.match(acronymRegex) || []).forEach(match => foundEntities.add(match));
+
+        // Regex for full names in the specified language, optionally followed by the acronym in parentheses
+        const namesInLang = org.names[lang as keyof typeof org.names];
+        if (namesInLang) {
+            namesInLang.forEach(name => {
+                // Escape special regex characters in the name, if any.
+                const escapedName = name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const nameRegex = new RegExp(`\\b${escapedName}(?:\\s*\\(\\s*${org.acronym}\\s*\\))?\\b`, 'gi');
+                (text.match(nameRegex) || []).forEach(match => foundEntities.add(match.trim()));
+            });
+        }
+    });
+
+    // 2. Find generic capitalized acronyms (3+ letters) that are not already found.
+    const genericAcronymRegex = /\b([A-Z][A-Z0-9]{2,})\b/g;
+    (text.match(genericAcronymRegex) || []).forEach(match => {
+        if (![...foundEntities].some(found => found.includes(match))) {
+            foundEntities.add(match);
+        }
+    });
+    
+    return Array.from(foundEntities);
+};
 
 
 /**
  * Extracts potential physical addresses from text using heuristic-based regexes for both
- * English and Farsi/Dari address patterns.
+ * English and Farsi/Dari address patterns. These are designed to be non-greedy by stopping at line breaks.
  * @param text The source text to analyze (should not be digit-normalized for Farsi patterns).
  * @returns An array of unique potential address strings.
  */
@@ -32,9 +85,10 @@ const extractPhysicalAddresses = (text: string): string[] => {
     // Pattern for typical English-style addresses (number first) and P.O. boxes.
     const englishAddressRegex = /\b(\d{1,5}\s+([A-Za-z0-9\s.,'#-]+?)\b(Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Place|Pl|Circle|Cir)|P\.?O\.?\s+Box\s+\d+)\b/gi;
     
-    // Pattern for Farsi/Dari-style addresses, looking for common keywords.
-    // This is a broad heuristic. It matches keywords and the text that follows.
-    const farsiAddressRegex = /(?:آدرس|خیابان|کوچه|بلوار|میدان|پلاک)\s*[:\s]*[A-Za-z\u0600-\u06FF\s\d۰-۹,.-]+/g;
+    // Pattern for Farsi/Dari-style addresses.
+    // This heuristic matches keywords and the text that follows,
+    // stopping at a newline or period to avoid capturing an entire sentence.
+    const farsiAddressRegex = /(?:آدرس|خیابان|کوچه|بلوار|میدان|پلاک)\s*[:\s]*[^\n\.]+/g;
 
     const englishMatches = text.match(englishAddressRegex) || [];
     const farsiMatches = text.match(farsiAddressRegex) || [];
@@ -49,7 +103,7 @@ const extractPhysicalAddresses = (text: string): string[] => {
 };
 
 
-export const analyzeTextResponse = (text: string): ExtractedEntities => {
+export const analyzeTextResponse = (text: string, langCode: string = 'en'): ExtractedEntities => {
   if (!text || !text.trim()) {
     return {
       mentioned_links_list: [],
@@ -60,7 +114,7 @@ export const analyzeTextResponse = (text: string): ExtractedEntities => {
       mentioned_phones_count: 0,
       physical_addresses_list: [],
       physical_addresses_count: 0,
-      mentioned_references_list: [], // This is now manual, so we return an empty list.
+      mentioned_references_list: [],
       mentioned_references_count: 0,
     };
   }
@@ -73,11 +127,15 @@ export const analyzeTextResponse = (text: string): ExtractedEntities => {
   
   // Use normalized text for phone numbers
   const raw_phones = Array.from(normalizedText.matchAll(PHONE_REGEX)).map(match => match[0]);
-  // Post-filter phone numbers to avoid overly short/simple numbers like '2024'
+  // Post-filter phone numbers to avoid overly short/simple numbers like '2024' or '123'.
+  // This check ensures we only capture legitimate-looking phone numbers by requiring at least 7 digits.
   const mentioned_phones_list = raw_phones.filter(phone => phone.replace(/\D/g, '').length >= 7);
 
   // Use original text for addresses to preserve Farsi characters and context
   const physical_addresses_list = extractPhysicalAddresses(text);
+
+  // Use original text for organization/acronym detection, passing the language code
+  const mentioned_references_list = extractOrganizationsAndAcronyms(text, langCode);
   
   return {
     mentioned_links_list,
@@ -88,7 +146,7 @@ export const analyzeTextResponse = (text: string): ExtractedEntities => {
     mentioned_phones_count: mentioned_phones_list.length,
     physical_addresses_list,
     physical_addresses_count: physical_addresses_list.length,
-    mentioned_references_list: [], // Explicitly return empty array for manual entry
-    mentioned_references_count: 0,
+    mentioned_references_list,
+    mentioned_references_count: mentioned_references_list.length,
   };
 };
