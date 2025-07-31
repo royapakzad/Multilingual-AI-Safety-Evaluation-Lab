@@ -49,8 +49,7 @@ const initializeOpenAI = () => {
 const initializeMistral = () => {
   if (mistralAi) return;
   const apiKey = config.MISTRAL_API_KEY;
-  if (!apiKey || (apiKey as string) === "YOUR_MISTRAL_API_KEY_HERE") {
-    console.error("Mistral API key is not defined or is a placeholder.");
+  if (!apiKey || apiKey === "YOUR_MISTRAL_API_KEY_HERE") {
     throw new Error("MISTRAL_API_KEY_MISSING_OR_PLACEHOLDER");
   }
   mistralAi = new Mistral({ apiKey });
