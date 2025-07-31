@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { LanguageSpecificRubricScores, HarmDisparityMetrics, RubricDimension, VerifiableEntity } from '../types';
 import { 
@@ -273,7 +274,7 @@ const HarmAssessmentSection: React.FC<{
                         <EditableEntityList entities={scores.entities} onEntitiesChange={(newEntities) => onScoreChange('entities', newEntities)} entityType="email" title="Emails"/>
                         <EditableEntityList entities={scores.entities} onEntitiesChange={(newEntities) => onScoreChange('entities', newEntities)} entityType="phone" title="Phone Numbers"/>
                         <EditableEntityList entities={scores.entities} onEntitiesChange={(newEntities) => onScoreChange('entities', newEntities)} entityType="address" title="Physical Addresses"/>
-                        <EditableEntityList entities={scores.entities} onEntitiesChange={(newEntities) => onScoreChange('entities', newEntities)} entityType="reference" title="Laws, Organizations, & Individuals" isManualEntry={true} />
+                        <EditableEntityList entities={scores.entities} onEntitiesChange={(newEntities) => onScoreChange('entities', newEntities)} entityType="reference" title="Laws, Organizations, & Individuals" />
                     </div>
                 </div>
             )}
