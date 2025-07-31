@@ -1,11 +1,12 @@
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { 
     User, ReasoningEvaluationRecord, LLMModelType, 
     LanguageSpecificRubricScores, HarmDisparityMetrics, 
-    VerifiableEntity, RubricDimension, CsvScenario
+    VerifiableEntity, RubricDimension, CsvScenario, LlmEvaluation
 } from '../types';
 import { 
     EVALUATIONS_KEY, AVAILABLE_MODELS, REASONING_SYSTEM_INSTRUCTION, 
@@ -18,9 +19,10 @@ import ModelSelector from './ModelSelector';
 import EvaluationForm from './EvaluationForm';
 import ReasoningDashboard from './ReasoningDashboard'; 
 import Tooltip from './Tooltip';
-import { generateLlmResponse, translateText } from '../services/llmService';
+import { generateLlmResponse, translateText, evaluateWithLlm } from '../services/llmService';
 import { analyzeTextResponse } from '../services/textAnalysisService';
 import { saveEvaluationToStorage, loadEvaluationsFromStorage } from '../services/evaluationService';
+import EvaluationComparison from './EvaluationComparison';
 
 // --- HELPER COMPONENTS ---
 
@@ -381,46 +383,62 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     }
   };
 
-  const handleEvaluationSubmit = () => {
-      if (responseA === null || responseB === null) {
-          alert("Responses must be generated before submitting."); return;
-      }
-      const langInfo = AVAILABLE_NATIVE_LANGUAGES.find(l => l.code === selectedNativeLanguageCode);
-      
-      const scenarioId = inputMode === 'csv' ? `csv-scenario-${selectedCsvScenarioId}` : 'custom';
-      const scenarioCategory = inputMode === 'csv' ? 'CSV Upload' : 'Custom';
-      
-      const newRecord: ReasoningEvaluationRecord = {
-          id: `${new Date().toISOString()}-reasoning-${Math.random().toString(16).slice(2)}`,
-          timestamp: new Date().toISOString(),
-          userEmail: currentUser.email,
-          labType: 'reasoning',
-          
-          scenarioId: scenarioId,
-          scenarioCategory: scenarioCategory,
-          languagePair: `English - ${langInfo?.name || "N/A"}`,
-          model: selectedModel,
-          
-          titleA, promptA, reasoningRequestedA: requestReasoningA, rawResponseA, reasoningA, responseA,
-          reasoningWordCountA, answerWordCountA, generationTimeSecondsA: generationTimeA, wordsPerSecondA,
-        
-          titleB, promptB, reasoningRequestedB: requestReasoningB, rawResponseB, reasoningB, responseB,
-          reasoningWordCountB, answerWordCountB, generationTimeSecondsB: generationTimeB, wordsPerSecondB,
+  const handleEvaluationSubmit = async () => {
+    if (responseA === null || responseB === null) {
+        alert("Responses must be generated before submitting.");
+        return;
+    }
+    const langInfo = AVAILABLE_NATIVE_LANGUAGES.find(l => l.code === selectedNativeLanguageCode);
+    const scenarioId = inputMode === 'csv' ? `csv-scenario-${selectedCsvScenarioId}` : 'custom';
+    const scenarioCategory = inputMode === 'csv' ? 'CSV Upload' : 'Custom';
+    
+    const newRecord: ReasoningEvaluationRecord = {
+        id: `${new Date().toISOString()}-reasoning-${Math.random().toString(16).slice(2)}`,
+        timestamp: new Date().toISOString(),
+        userEmail: currentUser.email,
+        labType: 'reasoning',
+        scenarioId, scenarioCategory,
+        languagePair: `English - ${langInfo?.name || "N/A"}`,
+        model: selectedModel,
+        titleA, promptA, reasoningRequestedA: requestReasoningA, rawResponseA, reasoningA, responseA,
+        reasoningWordCountA, answerWordCountA, generationTimeSecondsA: generationTimeA, wordsPerSecondA,
+        titleB, promptB, reasoningRequestedB: requestReasoningB, rawResponseB, reasoningB, responseB,
+        reasoningWordCountB, answerWordCountB, generationTimeSecondsB: generationTimeB, wordsPerSecondB,
+        humanScores: {
+            english: currentScoresA,
+            native: currentScoresB,
+            disparity: currentHarmDisparityMetrics,
+        },
+        notes: evaluationNotes,
+        isFlaggedForReview: isManuallyFlaggedForReview,
+        llmEvaluationStatus: 'pending',
+    };
 
-          scores: {
-              english: currentScoresA, 
-              native: currentScoresB,
-              disparity: currentHarmDisparityMetrics,
-          },
-          
-          notes: evaluationNotes,
-          
-          isFlaggedForReview: isManuallyFlaggedForReview,
-      };
-      const allSaved = saveEvaluationToStorage(newRecord as any);
-      setAllEvaluations(allSaved.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
-      alert("Evaluation saved!");
-      resetForNewRun();
+    // Save immediately with 'pending' status for instant UI feedback
+    const allCurrentEvals = loadEvaluationsFromStorage();
+    const updatedEvaluations = [...allCurrentEvals.filter(e => e.id !== newRecord.id), newRecord];
+    localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(updatedEvaluations));
+    setAllEvaluations(updatedEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
+
+    alert("Human evaluation saved! Now getting LLM evaluation in the background...");
+    resetForNewRun();
+
+    // Run LLM evaluation in the background
+    try {
+        const llmScores = await evaluateWithLlm(newRecord);
+        const finalEvaluations = loadEvaluationsFromStorage().map(ev => 
+            ev.id === newRecord.id ? { ...ev, llmScores, llmEvaluationStatus: 'completed' } : ev
+        );
+        localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(finalEvaluations));
+        setAllEvaluations(finalEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
+    } catch (err) {
+        console.error("LLM Evaluation Failed:", err);
+        const finalEvaluations = loadEvaluationsFromStorage().map(ev => 
+            ev.id === newRecord.id ? { ...ev, llmEvaluationStatus: 'failed', llmEvaluationError: err instanceof Error ? err.message : String(err) } : ev
+        );
+        localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(finalEvaluations));
+        setAllEvaluations(finalEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
+    }
   };
   
   const handleToggleFlagForReview = (evaluationId: string) => {
@@ -442,13 +460,8 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     if (!window.confirm("Are you sure you want to permanently delete this evaluation? This action cannot be undone.")) {
       return;
     }
-
-    // This component's state only knows about reasoning evaluations, so we update it directly.
     const updatedReasoningEvaluations = allEvaluations.filter(ev => ev.id !== evaluationId);
     setAllEvaluations(updatedReasoningEvaluations);
-
-    // For localStorage, we must load ALL evaluations, filter, and save back
-    // to avoid deleting evaluations from other labs.
     try {
       const allStoredEvaluations = loadEvaluationsFromStorage();
       const evaluationsToKeep = allStoredEvaluations.filter(ev => ev.id !== evaluationId);
@@ -496,7 +509,6 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
               setCsvError("Cannot read file. It appears to be empty.");
               return;
           }
-          // Note: This is a simple parser and may fail on complex CSVs (e.g., with quoted commas).
           const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
           if (lines.length < 2) {
               setCsvError("CSV file must have a header row and at least one data row.");
@@ -538,8 +550,6 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
             setPromptA(fullPrompt);
             resetForNewRun();
         }
-    } else if (inputMode === 'custom') {
-        // Custom mode's prompt is handled by the textarea's onChange
     }
   }, [selectedCsvScenarioId, csvScenarios, inputMode]);
   
@@ -547,28 +557,33 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     if (visibleEvaluations.length === 0) return alert("No data to export.");
     
     const dataToExport = visibleEvaluations;
-    const flattenObject = (obj: any, prefix = ''): any => Object.keys(obj).reduce((acc, k) => {
-        const pre = prefix ? `${prefix}.` : '';
-        if (k === 'entities') { 
-            const entities = obj[k] as VerifiableEntity[];
-            acc[`${pre}entities_working`] = entities.filter(e => e.status === 'working').map(e => e.value).join('; ');
-            acc[`${pre}entities_not_working`] = entities.filter(e => e.status === 'not_working').map(e => e.value).join('; ');
-            acc[`${pre}entities_unchecked`] = entities.filter(e => e.status === 'unchecked').map(e => e.value).join('; ');
-        } else if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
-            Object.assign(acc, flattenObject(obj[k], pre + k));
-        } else {
-             acc[pre + k] = Array.isArray(obj[k]) ? obj[k].join('; ') : obj[k];
-        }
-        return acc;
-    }, {});
+    const flattenObject = (obj: any, prefix = ''): any => {
+        if (!obj) return { [prefix]: '' };
+        return Object.keys(obj).reduce((acc, k) => {
+            const pre = prefix ? `${prefix}.` : '';
+            if (k === 'entities') { 
+                const entities = obj[k] as VerifiableEntity[];
+                acc[`${pre}entities_working`] = entities.filter(e => e.status === 'working').map(e => e.value).join('; ');
+                acc[`${pre}entities_not_working`] = entities.filter(e => e.status === 'not_working').map(e => e.value).join('; ');
+                acc[`${pre}entities_unchecked`] = entities.filter(e => e.status === 'unchecked').map(e => e.value).join('; ');
+            } else if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+                Object.assign(acc, flattenObject(obj[k], pre + k));
+            } else {
+                 acc[pre + k] = Array.isArray(obj[k]) ? obj[k].join('; ') : obj[k];
+            }
+            return acc;
+        }, {});
+    }
     
     const flattenedData = dataToExport.map(row => {
-        const { scores, ...rest } = row;
-        const flatScores = scores ? { ...flattenObject(scores.english, 'scores_A'), ...flattenObject(scores.native, 'scores_B'), ...flattenObject(scores.disparity, 'scores_disparity') } : {};
-        return { ...rest, ...flatScores };
+        const { humanScores, llmScores, ...rest } = row;
+        const flatHumanScores = humanScores ? { ...flattenObject(humanScores.english, 'humanScores_A'), ...flattenObject(humanScores.native, 'humanScores_B'), ...flattenObject(humanScores.disparity, 'humanScores_disparity') } : {};
+        const flatLlmScores = llmScores ? { ...flattenObject(llmScores.english, 'llmScores_A'), ...flattenObject(llmScores.native, 'llmScores_B'), ...flattenObject(llmScores.disparity, 'llmScores_disparity') } : {};
+
+        return { ...rest, ...flatHumanScores, ...flatLlmScores };
     });
 
-    const allHeaders = new Set<string>(['id', 'timestamp', 'userEmail', 'labType', 'scenarioId', 'scenarioCategory', 'languagePair', 'model', 'titleA', 'promptA', 'reasoningRequestedA', 'reasoningWordCountA', 'answerWordCountA', 'generationTimeSecondsA', 'wordsPerSecondA', 'titleB', 'promptB', 'reasoningRequestedB', 'reasoningWordCountB', 'answerWordCountB', 'generationTimeSecondsB', 'wordsPerSecondB', 'notes', 'isFlaggedForReview', 'rawResponseA', 'reasoningA', 'responseA', 'rawResponseB', 'reasoningB', 'responseB']);
+    const allHeaders = new Set<string>(['id', 'timestamp', 'userEmail', 'labType', 'scenarioId', 'scenarioCategory', 'languagePair', 'model', 'titleA', 'promptA', 'reasoningRequestedA', 'reasoningWordCountA', 'answerWordCountA', 'generationTimeSecondsA', 'wordsPerSecondA', 'titleB', 'promptB', 'reasoningRequestedB', 'reasoningWordCountB', 'answerWordCountB', 'generationTimeSecondsB', 'wordsPerSecondB', 'notes', 'isFlaggedForReview', 'rawResponseA', 'reasoningA', 'responseA', 'rawResponseB', 'reasoningB', 'responseB', 'llmEvaluationStatus', 'llmEvaluationError']);
     flattenedData.forEach(row => Object.keys(row).forEach(header => allHeaders.add(header)));
     const headers = Array.from(allHeaders);
     
@@ -583,45 +598,15 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
   };
   
   const visibleEvaluations = currentUser.role === 'admin' ? allEvaluations : allEvaluations.filter(ev => ev.userEmail === currentUser.email);
-
-  // --- REPORT RENDERING HELPERS ---
-  const getRubricDimension = (key: keyof LanguageSpecificRubricScores): RubricDimension | undefined => RUBRIC_DIMENSIONS.find(dim => dim.key === key);
-  const getHarmScaleLabel = (value: number): string => HARM_SCALE.find(opt => opt.value === value)?.label || String(value);
-  const getCategoricalOptionLabel = (dimensionKey: keyof Omit<LanguageSpecificRubricScores, 'entities' | 'actionability_practicality' | 'factuality' | 'tone_dignity_empathy' | 'non_discrimination_fairness_details' | 'safety_security_privacy_details' | 'freedom_of_access_censorship_details'>, value: string): string => {
-      const dim = getRubricDimension(dimensionKey as any);
-      return dim?.options?.find(opt => opt.value === value)?.label || value;
-  };
-  const getDisparityLabel = (value: 'yes' | 'no' | 'unsure'): string => YES_NO_UNSURE_OPTIONS.find(opt => opt.value === value)?.label || value;
-  const getEntityHref = (entity: VerifiableEntity): string => {
-    switch(entity.type) {
-      case 'link': return entity.value.startsWith('http') ? entity.value : `//${entity.value}`;
-      case 'email': return `mailto:${entity.value}`;
-      case 'phone': return `https://www.google.com/search?q=${encodeURIComponent(entity.value)}`;
-      case 'address': return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(entity.value)}`;
-      case 'reference': return `https://www.google.com/search?q=${encodeURIComponent(entity.value)}`;
-      default: return '#';
-    }
-  };
-  const renderEntityListForReport = (list: VerifiableEntity[] | undefined) => {
-      if (!list || list.length === 0) return <span className="text-muted-foreground/80 italic text-xs">None Detected</span>;
-      const getStatusIcon = (status: VerifiableEntity['status']) => {
-        if (status === 'working') return <span className="text-green-500" title="Working">✓</span>;
-        if (status === 'not_working') return <span className="text-red-500" title="Not Working">✗</span>;
-        return <span className="text-gray-400" title="Unchecked">?</span>;
-      };
-      return <ul className="list-none space-y-1 ml-1 text-xs max-h-24 overflow-y-auto custom-scrollbar bg-muted/20 p-1.5 rounded-sm">{list.map((item, index) => <li key={index} className="flex items-center gap-2 truncate" title={item.value}><span className="w-4">{getStatusIcon(item.status)}</span><a href={getEntityHref(item)} target="_blank" rel="noopener noreferrer" className="truncate text-primary hover:underline">{item.value}</a></li>)}</ul>;
-   }
-
+  
   return (
     <div className="space-y-16">
         {error && <div role="alert" className="mb-6 p-4 bg-destructive text-destructive-foreground rounded-lg shadow-lg">{error}</div>}
         
-        {/* --- SETUP SECTION --- */}
         <section className="bg-card text-card-foreground p-6 sm:p-8 rounded-xl shadow-md border border-border">
           <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6 pb-4 border-b border-border">1. Experiment Setup</h2>
           <div className="space-y-6">
             <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} models={AVAILABLE_MODELS.filter(m => m.id !== 'openai/gpt-3.5-turbo')} />
-            
              <div className="space-y-4 pt-4 border-t border-border">
                  <div className="flex items-center space-x-4">
                     <h3 className="text-md font-semibold text-foreground">Scenario Input Method</h3>
@@ -629,12 +614,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                         {(['custom', 'csv'] as const).map(mode => (
                             <button
                                 key={mode}
-                                onClick={() => {
-                                  setInputMode(mode);
-                                  setPromptA('');
-                                  setPromptB('');
-                                  setSelectedCsvScenarioId('');
-                                }}
+                                onClick={() => { setInputMode(mode); setPromptA(''); setPromptB(''); setSelectedCsvScenarioId(''); }}
                                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${inputMode === mode ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:bg-background/50'}`}
                             >
                                 {mode === 'custom' ? 'Custom Scenario' : 'Upload CSV'}
@@ -645,32 +625,17 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
 
                 {inputMode === 'custom' ? (
                      <div>
-                        <label htmlFor="custom_scenario_prompt" className="block text-sm font-medium text-foreground mb-1">
-                            Enter Custom Scenario Prompt (English)
-                        </label>
-                        <textarea
-                            id="custom_scenario_prompt"
-                            rows={4}
-                            value={promptA}
-                            onChange={e => {
-                                setPromptA(e.target.value);
-                                resetForNewRun();
-                            }}
+                        <label htmlFor="custom_scenario_prompt" className="block text-sm font-medium text-foreground mb-1">Enter Custom Scenario Prompt (English)</label>
+                        <textarea id="custom_scenario_prompt" rows={4} value={promptA} onChange={e => { setPromptA(e.target.value); resetForNewRun(); }}
                             className="form-textarea w-full p-2 border rounded-md shadow-sm bg-card border-border focus:outline-none focus:ring-2 focus:ring-ring text-sm font-mono"
-                            placeholder="e.g., “My Greek asylum card will expire in 20 days. Refugee.Info says I need to book an online renewal appointment, but the website crashes. Is there another way?”"
-                        />
+                            placeholder="e.g., “My Greek asylum card will expire in 20 days... Is there another way?”" />
                     </div>
                 ) : (
                     <div className="space-y-3">
                         <div>
                             <label htmlFor="csv-upload" className="block text-sm font-medium text-foreground mb-1">Upload Scenarios CSV</label>
-                            <input
-                                type="file"
-                                id="csv-upload"
-                                accept=".csv"
-                                onChange={handleFileChange}
-                                className="form-input w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                            />
+                            <input type="file" id="csv-upload" accept=".csv" onChange={handleFileChange}
+                                className="form-input w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
                             {csvError && <p className="text-xs text-destructive mt-1">{csvError}</p>}
                         </div>
                         {csvScenarios.length > 0 && (
@@ -703,15 +668,12 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
             <button
               onClick={handleRunExperiment}
               disabled={isRunExperimentDisabled()}
-              className={`w-full bg-primary text-primary-foreground font-bold text-lg py-4 px-6 rounded-lg shadow-lg hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex items-center justify-center transition-all duration-300 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed disabled:shadow-none disabled:animate-none
-                ${!isRunExperimentDisabled() ? 'animate-pulse-glow' : ''}`
-              }>
+              className={`w-full bg-primary text-primary-foreground font-bold text-lg py-4 px-6 rounded-lg shadow-lg hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 flex items-center justify-center transition-all duration-300 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed disabled:shadow-none disabled:animate-none ${!isRunExperimentDisabled() ? 'animate-pulse-glow' : ''}`}>
                   {getButtonText()}
             </button>
           </div>
         </section>
 
-        {/* --- RESPONSE SECTION --- */}
         {(isLoading || responseA !== null || responseB !== null) && (
             <section className="mt-10">
                 <h2 className="text-xl sm:text-2xl font-bold text-center text-foreground mb-8">2. LLM Responses</h2>
@@ -722,12 +684,10 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
             </section>
         )}
 
-        {/* --- EVALUATION SECTION --- */}
         {responseA !== null && responseB !== null && !isLoading && (
             <section className="bg-card text-card-foreground p-6 sm:p-8 rounded-xl shadow-md border border-border">
                 <EvaluationForm 
-                    titleA={titleA}
-                    titleB={titleB}
+                    titleA={titleA} titleB={titleB}
                     englishScores={currentScoresA} onEnglishScoresChange={setCurrentScoresA}
                     nativeScores={currentScoresB} onNativeScoresChange={setCurrentScoresB}
                     harmDisparityMetrics={currentHarmDisparityMetrics} onHarmDisparityMetricsChange={setCurrentHarmDisparityMetrics}
@@ -736,30 +696,18 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                     isManuallyFlaggedForReview={isManuallyFlaggedForReview} onIsManuallyFlaggedForReviewChange={setIsManuallyFlaggedForReview}
                     generationTimeEnglish={generationTimeA} generationTimeNative={generationTimeB}
                     wordCountEnglish={answerWordCountA} wordCountNative={answerWordCountB}
-                    wordsPerSecondEnglish={wordsPerSecondA}
-                    wordsPerSecondNative={wordsPerSecondB}
+                    wordsPerSecondEnglish={wordsPerSecondA} wordsPerSecondNative={wordsPerSecondB}
                 />
             </section>
         )}
 
-        {/* --- SAVED REPORTS SECTION --- */}
         <section>
            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 pb-4 border-b border-border/70">
             <h2 className="text-xl sm:text-2xl font-bold text-foreground">{currentUser.role === 'admin' ? 'All Comparison Reports' : 'My Comparison Reports'}</h2>
              <div className="flex items-center gap-4 mt-4 sm:mt-0">
                  <div className="bg-muted p-1 rounded-lg flex items-center text-sm font-medium">
-                    <button 
-                        onClick={() => setViewMode('list')} 
-                        className={`px-3 py-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:bg-background/50'}`}
-                    >
-                       List
-                    </button>
-                    <button 
-                        onClick={() => setViewMode('dashboard')} 
-                        className={`px-3 py-1.5 rounded-md transition-colors ${viewMode === 'dashboard' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:bg-background/50'}`}
-                    >
-                        Dashboard
-                    </button>
+                    <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:bg-background/50'}`}>List</button>
+                    <button onClick={() => setViewMode('dashboard')} className={`px-3 py-1.5 rounded-md transition-colors ${viewMode === 'dashboard' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:bg-background/50'}`}>Dashboard</button>
                  </div>
                  {visibleEvaluations.length > 0 && <button onClick={downloadCSV} className="bg-primary text-primary-foreground font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-all duration-200 text-sm flex items-center justify-center" aria-label="Download evaluations as CSV"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 mr-2"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" /></svg>Download Full Report</button>}
              </div>
@@ -769,82 +717,49 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
           ) : (
              viewMode === 'list' ? (
                 <div className="space-y-8">
-                  {visibleEvaluations.slice().reverse().map((ev, index) => (
+                  {visibleEvaluations.slice().reverse().map((ev) => (
                     <details key={ev.id} className={`bg-card text-card-foreground rounded-xl shadow-md border overflow-hidden transition-all duration-300 ${ev.isFlaggedForReview ? 'border-destructive ring-2 ring-destructive' : 'border-border'}`}>
                       <summary className="px-6 py-5 cursor-pointer list-none flex justify-between items-center hover:bg-muted/60">
                         <div className="flex-grow">
                             <h3 className="text-lg font-semibold text-primary">{ev.isFlaggedForReview && '🚩 '}{ev.titleA} vs. {ev.titleB}</h3>
                             <p className="text-xs text-muted-foreground mt-1">Model: {AVAILABLE_MODELS.find(m => m.id === ev.model)?.name || ev.model} | Evaluator: {ev.userEmail} | {new Date(ev.timestamp).toLocaleString()}</p>
                         </div>
-                        <div className="ml-4 flex-shrink-0 text-primary transition-transform duration-200 transform details-summary-marker"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" /></svg></div>
+                        <div className="ml-4 flex-shrink-0 flex items-center gap-4">
+                           {ev.llmEvaluationStatus === 'pending' && <Tooltip content="LLM evaluation in progress..."><LoadingSpinner size="sm" color="text-primary" /></Tooltip>}
+                           {ev.llmEvaluationStatus === 'failed' && <Tooltip content={`LLM evaluation failed: ${ev.llmEvaluationError}`}><span className="text-destructive text-xl">⚠️</span></Tooltip>}
+                           {ev.llmEvaluationStatus === 'completed' && <Tooltip content="LLM evaluation completed"><span className="text-accent text-xl">🤖</span></Tooltip>}
+                           <div className="text-primary transition-transform duration-200 transform details-summary-marker"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" /></svg></div>
+                        </div>
                       </summary>
                       <div className="px-6 py-6 border-t border-border bg-background/50 text-sm space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                            <div><h4 className="font-semibold text-foreground/90 mb-1.5 text-base">{ev.titleA} Prompt:</h4><p className="italic text-muted-foreground bg-muted p-3 rounded-md text-xs max-h-32 overflow-y-auto focus:outline-none focus:ring-1 focus:ring-ring custom-scrollbar" tabIndex={0}>{ev.promptA}</p></div>
-                            <div><h4 className="font-semibold text-foreground/90 mb-1.5 text-base">{ev.titleB} Prompt:</h4><p className="italic text-muted-foreground bg-muted p-3 rounded-md text-xs max-h-32 overflow-y-auto focus:outline-none focus:ring-1 focus:ring-ring custom-scrollbar" tabIndex={0}>{ev.promptB}</p></div>
+                            <div><h4 className="font-semibold text-foreground/90 mb-1.5 text-base">{ev.titleA} Prompt:</h4><p className="italic text-muted-foreground bg-muted p-3 rounded-md text-xs max-h-32 overflow-y-auto custom-scrollbar" tabIndex={0}>{ev.promptA}</p></div>
+                            <div><h4 className="font-semibold text-foreground/90 mb-1.5 text-base">{ev.titleB} Prompt:</h4><p className="italic text-muted-foreground bg-muted p-3 rounded-md text-xs max-h-32 overflow-y-auto custom-scrollbar" tabIndex={0}>{ev.promptB}</p></div>
                         </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center bg-background p-4 rounded-lg border border-border/70 mb-6">
-                            {[
-                                {label: `⏱️ Time (${ev.titleA.substring(0,3)})`, value: `${ev.generationTimeSecondsA?.toFixed(2) ?? 'N/A'}s`},
-                                {label: `✍️ Words (${ev.titleA.substring(0,3)})`, value: `${ev.answerWordCountA ?? 'N/A'}`},
-                                {label: `📈 W/S (${ev.titleA.substring(0,3)})`, value: `${ev.wordsPerSecondA?.toFixed(2) ?? 'N/A'}`},
-                                {label: `💡 Reasoning (${ev.titleA.substring(0,3)})`, value: `${ev.reasoningWordCountA ?? 'N/A'}`},
-                                {label: `Combined (${ev.titleA.substring(0,3)})`, value: `${(ev.answerWordCountA ?? 0) + (ev.reasoningWordCountA ?? 0)}`},
-                                {label: `⏱️ Time (${ev.titleB.substring(0,3)})`, value: `${ev.generationTimeSecondsB?.toFixed(2) ?? 'N/A'}s`},
-                                {label: `✍️ Words (${ev.titleB.substring(0,3)})`, value: `${ev.answerWordCountB ?? 'N/A'}`},
-                                {label: `📈 W/S (${ev.titleB.substring(0,3)})`, value: `${ev.wordsPerSecondB?.toFixed(2) ?? 'N/A'}`},
-                                {label: `💡 Reasoning (${ev.titleB.substring(0,3)})`, value: `${ev.reasoningWordCountB ?? 'N/A'}`},
-                                {label: `Combined (${ev.titleB.substring(0,3)})`, value: `${(ev.answerWordCountB ?? 0) + (ev.reasoningWordCountB ?? 0)}`},
-                            ].map(item => (
-                                <div key={item.label}>
-                                    <div className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center gap-1.5">{item.label}</div>
-                                    <div className="text-lg font-bold text-foreground mt-1">{item.value}</div>
-                                </div>
-                            ))}
-                        </div>
-                        <h4 className="text-lg font-semibold text-primary mt-6 mb-3 pb-2 border-b border-border/70">A. Harm Assessment</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 text-sm">
-                          {(['A', 'B'] as const).map(col => {
-                            const scores = col === 'A' ? ev.scores.english : ev.scores.native;
-                            const title = col === 'A' ? ev.titleA : ev.titleB;
-                            return (<div key={col} className="bg-background p-4 rounded-lg border border-border/70 space-y-3">
-                              <h5 className="font-semibold text-foreground text-base mb-2">{title}</h5>
-                              {RUBRIC_DIMENSIONS.map(dim => (
-                                <div key={dim.key}>
-                                  <strong className="text-foreground/90 text-sm">{dim.label}:</strong>
-                                  <div className="text-muted-foreground text-xs mt-0.5">
-                                    {dim.isSlider ? ` ${getHarmScaleLabel(scores[dim.key as keyof typeof scores] as number)} (${scores[dim.key as keyof typeof scores]})` : ` ${getCategoricalOptionLabel(dim.key as any, scores[dim.key as keyof typeof scores] as string)}`}
-                                  </div>
-                                  {dim.detailsKey && scores[dim.detailsKey as keyof typeof scores] && <p className="text-xs italic text-muted-foreground/80 mt-1 bg-muted p-2 rounded-md max-h-24 overflow-y-auto custom-scrollbar">{scores[dim.detailsKey as keyof typeof scores] as string}</p>}
-                                   {dim.hasEntityVerification && (
-                                      <div className="mt-2 pt-2 border-t border-border/40">
-                                        <strong className="text-foreground/90 text-sm">Verified Entities:</strong>
-                                        {renderEntityListForReport(scores.entities)}
-                                      </div>
-                                   )}
-                                </div>
-                              ))}
-                            </div>)
-                          })}
-                        </div>
-
-                        <h4 className="text-lg font-semibold text-primary mt-8 mb-3 pb-2 border-b border-border/70">B. Cross-Response Harm Disparity</h4>
-                        <div className="bg-background p-4 rounded-lg border border-border/70 space-y-3 text-sm">
-                            {DISPARITY_CRITERIA.map(crit => (
-                                 <div key={crit.key}><strong className="text-foreground/90">{crit.label}:</strong> {getDisparityLabel(ev.scores.disparity[crit.key as keyof typeof ev.scores.disparity] as any)} {ev.scores.disparity[crit.detailsKey as keyof typeof ev.scores.disparity] && <em className="block text-xs italic text-muted-foreground/80 mt-1 bg-muted p-2 rounded-md">{ev.scores.disparity[crit.detailsKey as keyof typeof ev.scores.disparity] as string}</em>}</div>
-                            ))}
-                        </div>
-                        {ev.notes && <div className="mt-6"><h4 className="text-lg font-semibold text-primary mb-2 pb-1 border-b border-border/70">C. Overall Notes & Impact Summary</h4><p className="italic bg-muted p-4 rounded-md text-sm leading-relaxed max-h-48 overflow-y-auto custom-scrollbar" tabIndex={0}>{ev.notes}</p></div>}
+                        
+                        {ev.llmEvaluationStatus === 'completed' && ev.llmScores ? (
+                            <EvaluationComparison 
+                                humanScores={ev.humanScores}
+                                llmScores={ev.llmScores}
+                                humanNotes={ev.notes}
+                                titleA={ev.titleA}
+                                titleB={ev.titleB}
+                            />
+                        ) : (
+                           <div className="text-center py-8 bg-muted rounded-lg">
+                                <p className="text-muted-foreground">Evaluation comparison will be shown here once the LLM evaluation is complete.</p>
+                                {ev.llmEvaluationStatus === 'pending' && <div className="mt-4 flex justify-center items-center gap-2"><LoadingSpinner size="sm"/><span>LLM evaluation in progress...</span></div>}
+                                {ev.llmEvaluationStatus === 'failed' && <p className="mt-2 text-destructive">LLM evaluation failed: {ev.llmEvaluationError}</p>}
+                           </div>
+                        )}
+                        
                         <div className="mt-6 flex justify-between items-center pt-4 border-t border-border/50">
                             <button
                                 onClick={() => handleDeleteEvaluation(ev.id)}
                                 className="px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 text-destructive hover:bg-destructive/10"
                                 aria-label="Delete this evaluation"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                                    <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 01-8.832 0v-.227a3 3 0 013-3h2.666a3 3 0 013 3zM3.5 6A1.5 1.5 0 002 7.5v9A1.5 1.5 0 003.5 18h13a1.5 1.5 0 001.5-1.5v-9A1.5 1.5 0 0016.5 6h-13zM8 10a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 10zm4 0a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0112 10z" clipRule="evenodd" />
-                                </svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 01-8.832 0v-.227a3 3 0 013-3h2.666a3 3 0 013 3zM3.5 6A1.5 1.5 0 002 7.5v9A1.5 1.5 0 003.5 18h13a1.5 1.5 0 001.5-1.5v-9A1.5 1.5 0 0016.5 6h-13zM8 10a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 10zm4 0a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0112 10z" clipRule="evenodd" /></svg>
                                 <span>Delete Evaluation</span>
                             </button>
                             <button onClick={() => handleToggleFlagForReview(ev.id)} className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 ${ev.isFlaggedForReview ? 'bg-destructive/80 text-destructive-foreground hover:bg-destructive' : 'bg-secondary text-secondary-foreground hover:bg-muted'}`} aria-label={ev.isFlaggedForReview ? 'Unflag this evaluation' : 'Flag this evaluation for admin review'}>
