@@ -300,14 +300,23 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
   
   const countWords = (text: string | null) => text ? text.trim().split(/\s+/).filter(Boolean).length : 0;
   
-  const convertToVerifiable = (text: string): VerifiableEntity[] => {
+  const convertToVerifiable = (text: string, langCode: string = 'en'): VerifiableEntity[] => {
       if (!text) return [];
-      const { mentioned_links_list, mentioned_emails_list, mentioned_phones_list, physical_addresses_list } = analyzeTextResponse(text);
+      const { 
+          mentioned_links_list, 
+          mentioned_emails_list, 
+          mentioned_phones_list, 
+          physical_addresses_list,
+          mentioned_references_list
+      } = analyzeTextResponse(text, langCode);
+
       const entities: VerifiableEntity[] = [];
       mentioned_links_list.forEach(value => entities.push({ id: `link-${Math.random()}`, value, type: 'link', status: 'unchecked'}));
       mentioned_emails_list.forEach(value => entities.push({ id: `email-${Math.random()}`, value, type: 'email', status: 'unchecked'}));
       mentioned_phones_list.forEach(value => entities.push({ id: `phone-${Math.random()}`, value, type: 'phone', status: 'unchecked'}));
       physical_addresses_list.forEach(value => entities.push({ id: `address-${Math.random()}`, value, type: 'address', status: 'unchecked'}));
+      mentioned_references_list.forEach(value => entities.push({ id: `reference-${Math.random()}`, value, type: 'reference', status: 'unchecked'}));
+      
       return entities;
   };
 
@@ -345,7 +354,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
         setResponseA(parsedA.answer);
         setReasoningWordCountA(countWords(parsedA.reasoning));
         setAnswerWordCountA(countWords(parsedA.answer));
-        setCurrentScoresA(prev => ({...prev, entities: convertToVerifiable(parsedA.answer)}));
+        setCurrentScoresA(prev => ({...prev, entities: convertToVerifiable(parsedA.answer, 'en')}));
 
         setRawResponseB(resB);
         const parsedB = parseReasoningAndAnswer(requestReasoningB ? resB : resB);
@@ -353,7 +362,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
         setResponseB(parsedB.answer);
         setReasoningWordCountB(countWords(parsedB.reasoning));
         setAnswerWordCountB(countWords(parsedB.answer));
-        setCurrentScoresB(prev => ({...prev, entities: convertToVerifiable(parsedB.answer)}));
+        setCurrentScoresB(prev => ({...prev, entities: convertToVerifiable(parsedB.answer, selectedNativeLanguageCode)}));
 
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred.");
