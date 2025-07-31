@@ -1,12 +1,7 @@
 
-
-
-
-
-
 import { GoogleGenAI, GenerateContentResponse, FinishReason, Type } from "@google/genai";
 import OpenAI from "openai";
-import MistralClient from "@mistralai/mistralai";
+import MistralAIClient from "@mistralai/mistralai";
 import { LLMModelType, ReasoningEvaluationRecord, LlmEvaluation, LlmRubricScores } from '../types';
 import { AVAILABLE_MODELS, RUBRIC_DIMENSIONS, DISPARITY_CRITERIA, HARM_SCALE, LLM_EVALUATOR_SYSTEM_INSTRUCTION } from '../constants';
 import * as config from '../env.js'; // Import API keys from env.js
@@ -14,7 +9,7 @@ import * as config from '../env.js'; // Import API keys from env.js
 // Caching initialized clients to avoid re-creation on every call
 let geminiAi: GoogleGenAI | null = null;
 let openaiAi: OpenAI | null = null;
-let mistralAi: MistralClient | null = null;
+let mistralAi: MistralAIClient | null = null;
 
 /**
  * Initializes the Google Gemini client if not already initialized.
@@ -57,7 +52,7 @@ const initializeMistral = () => {
     console.error("Mistral API key is not defined or is a placeholder.");
     throw new Error("MISTRAL_API_KEY_MISSING_OR_PLACEHOLDER");
   }
-  mistralAi = new MistralClient(apiKey);
+  mistralAi = new MistralAIClient({ apiKey: apiKey });
   console.log("Mistral AI client initialized.");
 };
 
