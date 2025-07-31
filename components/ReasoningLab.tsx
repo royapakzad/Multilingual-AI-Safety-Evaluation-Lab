@@ -201,6 +201,8 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
   const [answerWordCountB, setAnswerWordCountB] = useState<number>(0);
   const [reasoningWordCountA, setReasoningWordCountA] = useState<number>(0);
   const [reasoningWordCountB, setReasoningWordCountB] = useState<number>(0);
+  const [wordsPerSecondA, setWordsPerSecondA] = useState<number | null>(null);
+  const [wordsPerSecondB, setWordsPerSecondB] = useState<number | null>(null);
   
   // Evaluation State
   const [currentScoresA, setCurrentScoresA] = useState<LanguageSpecificRubricScores>({...INITIAL_LANGUAGE_SPECIFIC_RUBRIC_SCORES});
@@ -234,6 +236,8 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     setGenerationTimeA(null); setGenerationTimeB(null);
     setAnswerWordCountA(0); setAnswerWordCountB(0);
     setReasoningWordCountA(0); setReasoningWordCountB(0);
+    setWordsPerSecondA(null);
+    setWordsPerSecondB(null);
     setIsManuallyFlaggedForReview(false);
     setReasoningA(null); setReasoningB(null);
   };
@@ -341,28 +345,34 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
         const startTimeA = performance.now();
         const resA = await generateLlmResponse(promptA, selectedModel, configA);
         const endTimeA = performance.now();
-        setGenerationTimeA((endTimeA - startTimeA) / 1000);
+        const genTimeASeconds = (endTimeA - startTimeA) / 1000;
+        setGenerationTimeA(genTimeASeconds);
         
         const startTimeB = performance.now();
         const resB = await generateLlmResponse(promptB, selectedModel, configB);
         const endTimeB = performance.now();
-        setGenerationTimeB((endTimeB - startTimeB) / 1000);
+        const genTimeBSeconds = (endTimeB - startTimeB) / 1000;
+        setGenerationTimeB(genTimeBSeconds);
         
         setRawResponseA(resA);
         const parsedA = parseReasoningAndAnswer(requestReasoningA ? resA : resA);
         setReasoningA(parsedA.reasoning);
         setResponseA(parsedA.answer);
+        const ansWordsA = countWords(parsedA.answer);
         setReasoningWordCountA(countWords(parsedA.reasoning));
-        setAnswerWordCountA(countWords(parsedA.answer));
+        setAnswerWordCountA(ansWordsA);
         setCurrentScoresA(prev => ({...prev, entities: convertToVerifiable(parsedA.answer, 'en')}));
+        setWordsPerSecondA(genTimeASeconds > 0 ? ansWordsA / genTimeASeconds : 0);
 
         setRawResponseB(resB);
         const parsedB = parseReasoningAndAnswer(requestReasoningB ? resB : resB);
         setReasoningB(parsedB.reasoning);
         setResponseB(parsedB.answer);
+        const ansWordsB = countWords(parsedB.answer);
         setReasoningWordCountB(countWords(parsedB.reasoning));
-        setAnswerWordCountB(countWords(parsedB.answer));
+        setAnswerWordCountB(ansWordsB);
         setCurrentScoresB(prev => ({...prev, entities: convertToVerifiable(parsedB.answer, selectedNativeLanguageCode)}));
+        setWordsPerSecondB(genTimeBSeconds > 0 ? ansWordsB / genTimeBSeconds : 0);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred.");
@@ -392,10 +402,10 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
           model: selectedModel,
           
           titleA, promptA, reasoningRequestedA: requestReasoningA, rawResponseA, reasoningA, responseA,
-          reasoningWordCountA, answerWordCountA, generationTimeSecondsA: generationTimeA,
+          reasoningWordCountA, answerWordCountA, generationTimeSecondsA: generationTimeA, wordsPerSecondA,
         
           titleB, promptB, reasoningRequestedB: requestReasoningB, rawResponseB, reasoningB, responseB,
-          reasoningWordCountB, answerWordCountB, generationTimeSecondsB: generationTimeB,
+          reasoningWordCountB, answerWordCountB, generationTimeSecondsB: generationTimeB, wordsPerSecondB,
 
           scores: {
               english: currentScoresA, 
@@ -558,7 +568,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
         return { ...rest, ...flatScores };
     });
 
-    const allHeaders = new Set<string>(['id', 'timestamp', 'userEmail', 'labType', 'scenarioId', 'scenarioCategory', 'languagePair', 'model', 'titleA', 'promptA', 'reasoningRequestedA', 'reasoningWordCountA', 'answerWordCountA', 'generationTimeSecondsA', 'titleB', 'promptB', 'reasoningRequestedB', 'reasoningWordCountB', 'answerWordCountB', 'generationTimeSecondsB', 'notes', 'isFlaggedForReview', 'rawResponseA', 'reasoningA', 'responseA', 'rawResponseB', 'reasoningB', 'responseB']);
+    const allHeaders = new Set<string>(['id', 'timestamp', 'userEmail', 'labType', 'scenarioId', 'scenarioCategory', 'languagePair', 'model', 'titleA', 'promptA', 'reasoningRequestedA', 'reasoningWordCountA', 'answerWordCountA', 'generationTimeSecondsA', 'wordsPerSecondA', 'titleB', 'promptB', 'reasoningRequestedB', 'reasoningWordCountB', 'answerWordCountB', 'generationTimeSecondsB', 'wordsPerSecondB', 'notes', 'isFlaggedForReview', 'rawResponseA', 'reasoningA', 'responseA', 'rawResponseB', 'reasoningB', 'responseB']);
     flattenedData.forEach(row => Object.keys(row).forEach(header => allHeaders.add(header)));
     const headers = Array.from(allHeaders);
     
@@ -726,6 +736,8 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                     isManuallyFlaggedForReview={isManuallyFlaggedForReview} onIsManuallyFlaggedForReviewChange={setIsManuallyFlaggedForReview}
                     generationTimeEnglish={generationTimeA} generationTimeNative={generationTimeB}
                     wordCountEnglish={answerWordCountA} wordCountNative={answerWordCountB}
+                    wordsPerSecondEnglish={wordsPerSecondA}
+                    wordsPerSecondNative={wordsPerSecondB}
                 />
             </section>
         )}
@@ -738,13 +750,13 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                  <div className="bg-muted p-1 rounded-lg flex items-center text-sm font-medium">
                     <button 
                         onClick={() => setViewMode('list')} 
-                        className={`px-3 py-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'}`}
+                        className={`px-3 py-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:bg-background/50'}`}
                     >
                        List
                     </button>
                     <button 
                         onClick={() => setViewMode('dashboard')} 
-                        className={`px-3 py-1.5 rounded-md transition-colors ${viewMode === 'dashboard' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:bg-background/50'}`}
+                        className={`px-3 py-1.5 rounded-md transition-colors ${viewMode === 'dashboard' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:bg-background/50'}`}
                     >
                         Dashboard
                     </button>
@@ -772,14 +784,16 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                             <div><h4 className="font-semibold text-foreground/90 mb-1.5 text-base">{ev.titleB} Prompt:</h4><p className="italic text-muted-foreground bg-muted p-3 rounded-md text-xs max-h-32 overflow-y-auto focus:outline-none focus:ring-1 focus:ring-ring custom-scrollbar" tabIndex={0}>{ev.promptB}</p></div>
                         </div>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center bg-background p-4 rounded-lg border border-border/70 mb-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center bg-background p-4 rounded-lg border border-border/70 mb-6">
                             {[
                                 {label: `⏱️ Time (${ev.titleA.substring(0,3)})`, value: `${ev.generationTimeSecondsA?.toFixed(2) ?? 'N/A'}s`},
                                 {label: `✍️ Words (${ev.titleA.substring(0,3)})`, value: `${ev.answerWordCountA ?? 'N/A'}`},
+                                {label: `📈 W/S (${ev.titleA.substring(0,3)})`, value: `${ev.wordsPerSecondA?.toFixed(2) ?? 'N/A'}`},
                                 {label: `💡 Reasoning (${ev.titleA.substring(0,3)})`, value: `${ev.reasoningWordCountA ?? 'N/A'}`},
                                 {label: `Combined (${ev.titleA.substring(0,3)})`, value: `${(ev.answerWordCountA ?? 0) + (ev.reasoningWordCountA ?? 0)}`},
                                 {label: `⏱️ Time (${ev.titleB.substring(0,3)})`, value: `${ev.generationTimeSecondsB?.toFixed(2) ?? 'N/A'}s`},
                                 {label: `✍️ Words (${ev.titleB.substring(0,3)})`, value: `${ev.answerWordCountB ?? 'N/A'}`},
+                                {label: `📈 W/S (${ev.titleB.substring(0,3)})`, value: `${ev.wordsPerSecondB?.toFixed(2) ?? 'N/A'}`},
                                 {label: `💡 Reasoning (${ev.titleB.substring(0,3)})`, value: `${ev.reasoningWordCountB ?? 'N/A'}`},
                                 {label: `Combined (${ev.titleB.substring(0,3)})`, value: `${(ev.answerWordCountB ?? 0) + (ev.reasoningWordCountB ?? 0)}`},
                             ].map(item => (
