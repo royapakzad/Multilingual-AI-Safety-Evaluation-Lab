@@ -14,3 +14,4 @@ export * from './types/models';
 export * from './types/rubric';
 export * from './types/scenario';
 export * from './types/reasoning';
+export * from './types/llm-judge';
