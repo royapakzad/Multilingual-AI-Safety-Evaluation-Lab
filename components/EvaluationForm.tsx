@@ -99,10 +99,26 @@ const EditableEntityList: React.FC<{
     setEditingValue('');
   };
 
+  const parseLinkEntity = (value: string): { text: string; href: string } => {
+    // Catches [text](url) or [url](url)
+    let match = value.match(/\[(.*?)\]\((.*?)\)/);
+    if (match && match[1] !== undefined && match[2]) {
+        return { text: match[1] || match[2], href: match[2] };
+    }
+    // Catches malformed text](url)
+    match = value.match(/(.*?)\]\((.*?)\)/);
+    if (match && match[1] && match[2]) {
+        return { text: match[1], href: match[2] };
+    }
+    // Default case: the whole value is the link
+    return { text: value, href: value };
+  };
+
   const getEntityHref = (entity: VerifiableEntity): string => {
     switch(entity.type) {
       case 'link':
-        return entity.value.startsWith('http') ? entity.value : `//${entity.value}`;
+        const { href } = parseLinkEntity(entity.value);
+        return href.startsWith('http') ? href : `//${href}`;
       case 'email':
         return `mailto:${entity.value}`;
       case 'phone':
@@ -116,6 +132,13 @@ const EditableEntityList: React.FC<{
     }
   }
   
+  const getEntityDisplayValue = (entity: VerifiableEntity): string => {
+    if (entity.type === 'link') {
+      return parseLinkEntity(entity.value).text;
+    }
+    return entity.value;
+  };
+
   return (
     <div className="bg-background p-3 rounded-lg border border-border/60">
         <div className="flex justify-between items-center mb-2">
@@ -151,7 +174,7 @@ const EditableEntityList: React.FC<{
                       </div>
                     ) : (
                       <>
-                        <a href={getEntityHref(entity)} target="_blank" rel="noopener noreferrer" className="flex-grow font-mono truncate text-primary hover:underline" title={`Verify: ${entity.value}`}>{entity.value}</a>
+                        <a href={getEntityHref(entity)} target="_blank" rel="noopener noreferrer" className="flex-grow font-mono truncate text-primary hover:underline" title={`Verify: ${entity.value}`}>{getEntityDisplayValue(entity)}</a>
                         <div className="flex-shrink-0 flex items-center gap-1.5">
                             <button type="button" onClick={() => handleStatusUpdate(entity.id, 'working')} className={`px-1.5 py-0.5 rounded ${entity.status === 'working' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-800 hover:bg-green-200'}`} aria-label="Mark as working">✓</button>
                             <button type="button" onClick={() => handleStatusUpdate(entity.id, 'not_working')} className={`px-1.5 py-0.5 rounded ${entity.status === 'not_working' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-800 hover:bg-red-200'}`} aria-label="Mark as not working">✗</button>
