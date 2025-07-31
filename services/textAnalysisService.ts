@@ -49,7 +49,10 @@ const extractOrganizationsAndAcronyms = (text: string, langCode: string = 'en'):
     orgDictionary.forEach(org => {
         // Regex for the acronym, allowing for dots (e.g., U.N.H.C.R.)
         const acronymRegex = new RegExp(`\\b${org.acronym.split('').join('\\.?')}\\b`, 'gi');
-        (text.match(acronymRegex) || []).forEach(match => foundEntities.add(match));
+        const acronymMatches = text.match(acronymRegex);
+        if (acronymMatches) {
+            acronymMatches.forEach(match => foundEntities.add(match));
+        }
 
         // Regex for full names in the specified language, optionally followed by the acronym in parentheses
         const namesInLang = org.names[lang as keyof typeof org.names];
@@ -58,18 +61,24 @@ const extractOrganizationsAndAcronyms = (text: string, langCode: string = 'en'):
                 // Escape special regex characters in the name, if any.
                 const escapedName = name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
                 const nameRegex = new RegExp(`\\b${escapedName}(?:\\s*\\(\\s*${org.acronym}\\s*\\))?\\b`, 'gi');
-                (text.match(nameRegex) || []).forEach(match => foundEntities.add(match.trim()));
+                const nameMatches = text.match(nameRegex);
+                if (nameMatches) {
+                    nameMatches.forEach(match => foundEntities.add(match.trim()));
+                }
             });
         }
     });
 
     // 2. Find generic capitalized acronyms (3+ letters) that are not already found.
     const genericAcronymRegex = /\b([A-Z][A-Z0-9]{2,})\b/g;
-    (text.match(genericAcronymRegex) || []).forEach(match => {
-        if (![...foundEntities].some(found => found.includes(match))) {
-            foundEntities.add(match);
-        }
-    });
+    const genericMatches = text.match(genericAcronymRegex);
+    if (genericMatches) {
+        genericMatches.forEach(match => {
+            if (![...foundEntities].some(found => found.includes(match))) {
+                foundEntities.add(match);
+            }
+        });
+    }
     
     return Array.from(foundEntities);
 };
