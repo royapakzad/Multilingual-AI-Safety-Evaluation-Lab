@@ -190,6 +190,8 @@ const ReasoningDashboard: React.FC<ReasoningDashboardProps> = ({ evaluations }) 
             avgWordsB: evaluations.reduce((acc, curr) => acc + curr.answerWordCountB, 0) / totalEvals,
             avgReasoningWordsA: withReasoningA.length > 0 ? withReasoningA.reduce((acc, curr) => acc + curr.reasoningWordCountA, 0) / withReasoningA.length : 0,
             avgReasoningWordsB: withReasoningB.length > 0 ? withReasoningB.reduce((acc, curr) => acc + curr.reasoningWordCountB, 0) / withReasoningB.length : 0,
+            avgWordsPerSecondA: evaluations.reduce((acc, curr) => acc + (curr.wordsPerSecondA ?? 0), 0) / totalEvals,
+            avgWordsPerSecondB: evaluations.reduce((acc, curr) => acc + (curr.wordsPerSecondB ?? 0), 0) / totalEvals,
         };
     }, [evaluations]);
 
@@ -303,6 +305,7 @@ const ReasoningDashboard: React.FC<ReasoningDashboardProps> = ({ evaluations }) 
                     <BarChart data={[
                         { label: 'Generation Time', valueA: metrics.avgTimeA, valueB: metrics.avgTimeB, unit: 's' },
                         { label: 'Answer Words', valueA: metrics.avgWordsA, valueB: metrics.avgWordsB, unit: '' },
+                        { label: 'Words/Second', valueA: metrics.avgWordsPerSecondA, valueB: metrics.avgWordsPerSecondB, unit: '' },
                         { label: 'Reasoning Words', valueA: metrics.avgReasoningWordsA, valueB: metrics.avgReasoningWordsB, unit: '' },
                     ]} />
                 </DashboardCard>
