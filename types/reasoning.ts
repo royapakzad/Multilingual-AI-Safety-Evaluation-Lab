@@ -1,6 +1,7 @@
 // types/reasoning.ts
 
 import { LLMModelType, LanguageSpecificRubricScores, HarmDisparityMetrics } from './';
+import { LlmEvaluation } from './llm-judge';
 
 /**
  * Represents a complete evaluation record from the A/B Comparison Lab.
@@ -42,16 +43,18 @@ export interface ReasoningEvaluationRecord {
   generationTimeSecondsB?: number;
   wordsPerSecondB?: number;
 
-  // Evaluation
-  scores: {
-    // Note: The evaluator interprets 'english' vs 'native' scores
-    // in the context of their A/B test. 'english' maps to Column A, 'native' to Column B.
+  // Human Evaluation
+  humanScores: {
     english: LanguageSpecificRubricScores;
     native: LanguageSpecificRubricScores;
     disparity: HarmDisparityMetrics;
   };
-  
-  notes: string;
+  notes: string; // Human notes
   
   isFlaggedForReview?: boolean;
+
+  // LLM as Judge
+  llmScores?: LlmEvaluation;
+  llmEvaluationStatus: 'not_started' | 'pending' | 'completed' | 'failed';
+  llmEvaluationError?: string;
 }
