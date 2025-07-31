@@ -215,6 +215,8 @@ interface EvaluationFormProps {
   generationTimeNative?: number | null;
   wordCountEnglish?: number;
   wordCountNative?: number;
+  wordsPerSecondEnglish?: number | null;
+  wordsPerSecondNative?: number | null;
 }
 
 const HarmAssessmentSection: React.FC<{
@@ -321,7 +323,9 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
   generationTimeEnglish,
   generationTimeNative,
   wordCountEnglish,
-  wordCountNative
+  wordCountNative,
+  wordsPerSecondEnglish,
+  wordsPerSecondNative
 }) => {
 
   const handleScoreChange = (setter: Function, currentScores: LanguageSpecificRubricScores) => 
@@ -356,6 +360,9 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
             <div>
                 <div className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center gap-1.5" title={safeTitleA}>✍️ Words (A)</div>
                 <div className="text-lg font-bold text-foreground mt-1">{wordCountEnglish ?? 'N/A'}</div>
+                {wordsPerSecondEnglish != null && (
+                    <div className="text-xs text-muted-foreground mt-0.5">({wordsPerSecondEnglish.toFixed(2)} w/s)</div>
+                )}
             </div>
             <div>
                 <div className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center gap-1.5" title={safeTitleB}>⏱️ Time (B)</div>
@@ -364,6 +371,9 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
             <div>
                 <div className="text-xs sm:text-sm text-muted-foreground flex items-center justify-center gap-1.5" title={safeTitleB}>✍️ Words (B)</div>
                 <div className="text-lg font-bold text-foreground mt-1">{wordCountNative ?? 'N/A'}</div>
+                {wordsPerSecondNative != null && (
+                    <div className="text-xs text-muted-foreground mt-0.5">({wordsPerSecondNative.toFixed(2)} w/s)</div>
+                )}
             </div>
         </div>
       </div>
