@@ -54,7 +54,6 @@ const initializeMistral = () => {
     throw new Error("MISTRAL_API_KEY_MISSING_OR_PLACEHOLDER");
   }
   mistralAi = new Mistral({ apiKey });
-  console.log("Mistral AI client initialized.");
 };
 
 /**
