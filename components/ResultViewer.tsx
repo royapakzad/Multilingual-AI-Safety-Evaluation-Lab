@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ChatMessage } from '../types';
 import LoadingSpinner from './LoadingSpinner';
@@ -45,7 +46,10 @@ const createMarkup = (markdownText: string | undefined) => {
     }
 
     try {
-        const rawMarkup = marked(markdownText, { breaks: true, gfm: true });
+        // Pre-process to fix malformed links like [https...](https...) where both parts are the same URL.
+        const correctedMarkdown = markdownText.replace(/\[(https?:\/\/[^\]]+)\]\(\1\)/g, '$1');
+
+        const rawMarkup = marked(correctedMarkdown, { breaks: true, gfm: true });
         
         // Sanitize the HTML and return a DOM fragment, which is safer for manipulation
         const sanitizedFragment = DOMPurify.sanitize(rawMarkup as string, { RETURN_DOM_FRAGMENT: true });
