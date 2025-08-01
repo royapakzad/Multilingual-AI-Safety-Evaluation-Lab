@@ -232,10 +232,12 @@ const ReasoningDashboard: React.FC<ReasoningDashboardProps> = ({ evaluations }) 
         const sumB = dimensions.map(() => 0);
 
         evaluations.forEach(ev => {
-            dimensions.forEach((dim, i) => {
-                sumA[i] += getNumericScore(dim, ev.humanScores.english);
-                sumB[i] += getNumericScore(dim, ev.humanScores.native);
-            });
+            if (ev.humanScores?.english && ev.humanScores?.native) {
+                dimensions.forEach((dim, i) => {
+                    sumA[i] += getNumericScore(dim, ev.humanScores.english);
+                    sumB[i] += getNumericScore(dim, ev.humanScores.native);
+                });
+            }
         });
 
         return {
@@ -261,7 +263,13 @@ const ReasoningDashboard: React.FC<ReasoningDashboardProps> = ({ evaluations }) 
     }, [evaluations]);
     
     const agreementMetrics = useMemo(() => {
-        const completedEvals = evaluations.filter(e => e.llmEvaluationStatus === 'completed' && e.llmScores);
+        const completedEvals = evaluations.filter(e => 
+            e.llmEvaluationStatus === 'completed' && 
+            e.llmScores &&
+            e.llmScores.english &&
+            e.llmScores.native &&
+            e.llmScores.disparity
+        );
         if (completedEvals.length === 0) return null;
 
         const agreementData = RUBRIC_DIMENSIONS.map(dim => {
