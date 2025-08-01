@@ -2,7 +2,7 @@
 
 import { GoogleGenAI, GenerateContentResponse, FinishReason, Type } from "@google/genai";
 import OpenAI from "openai";
-import Mistral from "@mistralai/mistralai";   // default export name in the old SDK
+import { Mistral } from "@mistralai/mistralai";
 import { LLMModelType, ReasoningEvaluationRecord, LlmEvaluation, LlmRubricScores } from '../types';
 import { AVAILABLE_MODELS, RUBRIC_DIMENSIONS, DISPARITY_CRITERIA, HARM_SCALE, LLM_EVALUATOR_SYSTEM_INSTRUCTION } from '../constants';
 import * as config from '../env.js'; // Import API keys from env.js
@@ -115,20 +115,25 @@ export const generateLlmResponse = async (prompt: string, modelId: LLMModelType,
       const response = await openaiAi.chat.completions.create({ model: actualModelId, messages });
       return response.choices[0]?.message?.content?.trim() || `No text content received from OpenAI. Finish reason: ${response.choices[0]?.finish_reason || 'N/A'}.`;
 
-    } else if (provider === 'mistral') {
-      initializeMistral();
-      if (!mistralAi) throw new Error("Mistral AI client not initialized.");
+    } else if (provider === "mistral") {
+  initializeMistral();
+  const messages = [
+    ...(providerConfig?.systemInstruction
+        ? [{ role: "system", content: providerConfig.systemInstruction }]
+        : []),
+    { role: "user", content: prompt },
+  ];
 
-      const messages: any[] = [];
-      if (providerConfig?.systemInstruction) {
-          messages.push({ role: "system", content: providerConfig.systemInstruction });
-      }
-      messages.push({ role: 'user', content: prompt });
+  const resp = await mistralAi!.chat.complete({     // ✅ use .complete
+    model: actualModelId,
+    messages,
+  });
 
-      const response = await mistralAi.chat({ model: actualModelId, messages });
-      return response.choices[0]?.message?.content?.trim() || `No text content received from Mistral. Finish reason: ${response.choices[0]?.finish_reason || 'N/A'}.`;
-    
-    } else {
+  return (
+    resp.choices[0]?.message?.content?.trim() ||
+    `No text received (finish reason: ${resp.choices[0]?.finish_reason ?? "N/A"}).`
+  );
+} else {
       throw new Error(`Unsupported LLM provider: ${provider}`);
     }
   } catch (error) {
