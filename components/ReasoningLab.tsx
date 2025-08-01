@@ -560,7 +560,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     const flattenObject = (obj: any, prefix = ''): any => {
         if (!obj) return { [prefix]: '' };
         return Object.keys(obj).reduce((acc, k) => {
-            const pre = prefix ? `${prefix}.` : '';
+            const pre = prefix ? `${prefix}_` : '';
             if (k === 'entities') { 
                 const entities = obj[k] as VerifiableEntity[];
                 acc[`${pre}entities_working`] = entities.filter(e => e.status === 'working').map(e => e.value).join('; ');
@@ -572,7 +572,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                  acc[pre + k] = Array.isArray(obj[k]) ? obj[k].join('; ') : obj[k];
             }
             return acc;
-        }, {});
+        }, {} as Record<string, any>);
     }
     
     const flattenedData = dataToExport.map(row => {
