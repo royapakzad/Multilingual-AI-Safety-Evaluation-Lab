@@ -517,11 +517,10 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
 
           const headerLine = lines[0].trim().split(',');
           const header = headerLine.map(h => h.trim().toLowerCase().replace(/"/g, ''));
-          const contextIndex = header.indexOf('context');
           const promptIndex = header.indexOf('prompt');
 
-          if (contextIndex === -1 || promptIndex === -1) {
-              setCsvError("CSV header must contain 'context' and 'prompt' columns.");
+          if (promptIndex === -1) {
+              setCsvError("CSV header must contain a 'prompt' column.");
               return;
           }
 
@@ -529,7 +528,6 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
               const columns = line.split(',');
               return {
                   id: index + 1,
-                  context: columns[contextIndex]?.trim().replace(/^"|"$/g, '') || '',
                   prompt: columns[promptIndex]?.trim().replace(/^"|"$/g, '') || ''
               };
           });
@@ -634,6 +632,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                     <div className="space-y-3">
                         <div>
                             <label htmlFor="csv-upload" className="block text-sm font-medium text-foreground mb-1">Upload Scenarios CSV</label>
+                            <p className="text-xs text-muted-foreground mb-2">The CSV file must contain a header row with a column named "prompt".</p>
                             <input type="file" id="csv-upload" accept=".csv" onChange={handleFileChange}
                                 className="form-input w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
                             {csvError && <p className="text-xs text-destructive mt-1">{csvError}</p>}
