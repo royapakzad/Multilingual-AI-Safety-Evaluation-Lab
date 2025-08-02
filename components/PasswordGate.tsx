@@ -22,7 +22,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSubmit, loginError }) => {
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-16 h-16 text-primary mx-auto mb-4">
             <path fillRule="evenodd" d="M8 10V7a4 4 0 118 0v3h1a2 2 0 012 2v5a2 2 0 01-2 2H7a2 2 0 01-2-2v-5a2 2 0 012-2h1zm4-6a2 2 0 00-2 2v3h4V7a2 2 0 00-2-2z" clipRule="evenodd" />
           </svg>
-          <h1 className="text-3xl font-bold text-foreground">Multilingual LLM Safety Evaluation Labs</h1>
+          <h1 className="text-3xl font-bold text-foreground">Multilingual AI Safety Evaluation Laboratory</h1>
           <p className="text-muted-foreground mt-2">Enter your credentials to continue.</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-6">
