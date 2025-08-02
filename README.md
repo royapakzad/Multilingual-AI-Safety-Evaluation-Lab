@@ -1,39 +1,63 @@
-# Multilingual LLM Mini-Lab
 
-**This application now has a two-level access system. See Section 2 for login details.**
+# Multilingual AI Safety Evaluation Laboratory
 
-## 1. Goals of the Application
+## 1. Introduction: The Importance of Multilingual Evaluation
 
-The Multilingual LLM Mini-Lab is a web-based platform for workshop participants to:
+The **Multilingual AI Safety & Alignment Evaluation Laboratory** is a specialized research tool designed to address a critical gap in AI safety: the evaluation of Large Language Models (LLMs) in non-English contexts.
 
-*   **Evaluate Multiple LLMs:** Test models from Google (Gemini), OpenAI (GPT), and Mistral on their performance with multilingual content relevant to refugee, asylum seeker, and displaced person scenarios. The evaluation explicitly uses a **human rights-based approach**.
-*   **Auto-Translate & Compare:**
-    *   Upload scenarios from a CSV file or create custom prompts. A sample CSV should contain `category` and `prompt_en` headers.
-    *   Choose a target native language.
-    *   Utilize bi-directional auto-translation for custom prompts.
-    *   Generate responses for both English and native language prompts using the selected LLM.
-*   **Human-Rights Aware Evaluation (UN B-Tech Aligned):**
-    *   **A. Harm Assessment (Single Response):** Assess each language's response against a rubric derived from the UN B-Tech GenAI taxonomy of harm. Criteria include: `Access to Information & Essential Services`, `Non-Discrimination & Fairness`, `Safety, Security & Dignity`, `Freedom of Expression & Privacy`, and `Access to Remedy`.
-    *   **B. Harm Disparity Assessment (Cross-Language):** Evaluate disparities between English and native language responses to identify if the level of risk or protection is unequal across languages.
-*   **Detailed Response Analysis:** Automatically extract and display Links, Email Addresses, Phone Numbers, and Physical Addresses from LLM responses to aid in the "Access to Remedy" evaluation.
-*   **Data Collection & Reporting:** Save detailed evaluations locally, associated with the logged-in user. Admins can view all evaluations, while Evaluators can only view their own. Download evaluation reports as a CSV file.
-*   **Raise Awareness:** Highlight potential harmful outcomes from language and moderation inconsistencies, viewed through a human rights lens.
+While most LLM development and testing is English-centric, the majority of the world's population does not speak English. This creates a significant blind spot where models may be less helpful, less accurate, or even more dangerous when used in other languages.
 
-## 2. Access Control & Login
+This lab's primary purpose is to empower researchers, developers, and policymakers to rigorously assess **how model performance, safety, and alignment change across different languages**. It provides the tools to move beyond assumptions and gather concrete evidence, ensuring that AI systems are developed and deployed in a way that is equitable, fair, and safe for global, multilingual populations.
+
+## 2. Core Capabilities
+
+The platform is built around a primary A/B comparison lab and a powerful meta-evaluation system, all designed with a multilingual focus.
+
+#### A. Systematic Multilingual Evaluation
+This is the lab's core function. It facilitates the **direct comparison** of an LLM's response to an English prompt versus its response to the same prompt translated into one of dozens of supported languages. This allows for precise measurement of:
+*   **Performance Degradation:** Does the quality, accuracy, or coherence of the answer decrease in the target language?
+*   **Logical Inconsistencies:** Does the model contradict itself or show a flawed reasoning process in one language but not the other?
+*   **Safety Guardrail Failure:** Are safety filters weaker or more easily bypassed in non-English interactions?
+
+#### B. Human Rights-Based Evaluation Rubric
+All evaluations are conducted using a comprehensive rubric derived from the **UN B-Tech Project's GenAI taxonomy of harm**. This is not a generic quality assessment; it is a specialized framework designed to measure the human rights impact of AI-generated content, a methodology that is crucial for assessing harms that may disproportionately affect vulnerable, non-English-speaking communities.
+
+#### C. "LLM as a Judge" Meta-Evaluation
+This feature allows for research into the scalability and reliability of AI evaluation itself. By comparing a human's scores to those of a Gemini-powered "LLM Judge," we can study how well automated systems capture nuanced, language-specific failures, a key challenge in creating globally relevant evaluation standards.
+
+## 3. Benefits: Why Multilingual Evaluation Matters for Responsible AI
+
+This lab is a critical tool for any organization committed to the safe and ethical deployment of AI, particularly for public-facing bodies like government agencies.
+
+*   **Exposing Language-Based Disparities & Harms:** Most safety benchmarks are heavily English-centric. This lab provides the tools to uncover hidden risks that only manifest in other languages. Are safety guardrails weaker? Is the model more likely to produce misinformation or biased content in Spanish, Urdu, or Swahili? Answering these questions is fundamental to deploying AI responsibly in a global context.
+*   **Ensuring Global Equity:** Public services and information access must be equitable for all. This tool allows for the direct assessment of an LLM's utility and safety for minority language speakers, preventing the rollout of systems that are inadvertently discriminatory.
+*   **Evidence for Governance & Procurement:** It provides concrete, qualitative data that goes beyond marketing claims. By providing clear evidence of a model's multilingual capabilities (or lack thereof), agencies can make informed procurement decisions that serve their *entire* constituency, not just English speakers.
+*   **Developing Better, Safer Models:** By identifying *why* a model fails in specific languages, developers can create better fine-tuning strategies, more robust safety systems, and interaction protocols that are safer for a global user base.
+
+## 4. Future Development Roadmap
+
+This platform is under active development. Key areas for future expansion include:
+
+*   **Advanced Internationalization & Localization Testing:** Moving beyond direct translation to evaluate a model's understanding of cultural nuance, regional dialects, and localized content appropriateness.
+*   **Agentic System Evaluation:** Introducing simulations of multi-turn, task-oriented workflows to evaluate the safety and alignment of AI agents over extended interactions in different languages.
+*   **Structured Red Teaming Integration:** Incorporating modules that allow evaluators to use structured, adversarial prompts to proactively probe for vulnerabilities and "jailbreaks," with a focus on exploits that are language-specific.
+*   **Multi-modal Evaluation:** Expanding the framework to assess the safety and alignment of models that generate images, audio, and video content based on multilingual prompts.
+*   **Enhanced Analytics & Longitudinal Tracking:** Building more sophisticated dashboard visualizations to track model performance and safety drift over time, specifically comparing language-based cohorts.
+
+## 5. Access Control & Login
 
 The application features a two-level access system:
 
 *   **Admin Access:**
-    *   **Username:** `rpakzad@taraazresearch.org`
-    *   **Password:** `
-    *   **Permissions:** Admins can view all evaluations submitted by all users and download a complete CSV of all data.
+    *   **Permissions:** Admins can view all evaluations submitted by all users and download a complete CSV of all data from the platform.
+    *   **Login:** Please contact the project administrator for admin credentials.
 
 *   **Evaluator Access:**
     *   **Username:** Your email address (e.g., `user@example.com`)
     *   **Password:** Your email address (the same as your username)
     *   **Permissions:** Evaluators can conduct experiments, submit evaluations, view only their own past evaluations, and download a CSV of their own data.
 
-## 3. API Key Configuration (Crucial!)
+## 6. API Key Configuration (Crucial!)
 
 This application requires API keys for Google Gemini, OpenAI, and Mistral models to function fully.
 
@@ -61,7 +85,7 @@ This application requires API keys for Google Gemini, OpenAI, and Mistral models
 
 The application will read keys from `env.js` and display a prominent warning if any are missing or are still placeholders.
 
-## 4. Codebase Philosophy & Best Practices
+## 7. Codebase Philosophy & Best Practices
 
 This project is structured for modularity and maintainability. Key principles for developers include:
 
@@ -74,25 +98,20 @@ This project is structured for modularity and maintainability. Key principles fo
 *   **Clean Imports:** The `index.ts` file in both `types/` and `constants/` allows for clean, simple imports (e.g., `import { User } from './types';`).
 *   **Clear Commenting:** Add concise, professional comments to explain the *why* behind complex code, not just the *what*.
 
-## 5. Future Roadmap
-
-A detailed plan for future features and architectural improvements is maintained in `featureroadmap.md`. This includes a multi-phase plan and a guide for developers. We encourage all contributors to review it.
-
-## 6. File System Overview
+## 8. File System Overview
 
 ```
-multilingual-mini-lab/
+llm-safety-lab/
 ├── components/         # React components
 ├── constants/          # App constants (models, rubric, etc.)
 ├── services/           # API clients and business logic
 ├── types/              # TypeScript type definitions
 ├── public/
-│   └── scenarios.json  # Sample scenario file, not loaded by default
+│   └── scenarios.json  # Not currently used, but available for future features
 ├── App.tsx             # Main application component
 ├── env.js              # Local API Key Config (gitignore this!)
 ├── index.html
 ├── index.tsx
 ├── README.md           # This file
-├── featureroadmap.md   # NEW: Future plans and dev guide
 └── llmtaskscompleted.md # Log of completed work
 ```
