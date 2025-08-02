@@ -3,7 +3,7 @@
 
 ## 1. Introduction: The Importance of Multilingual Evaluation
 
-The **Multilingual AI Safety & Alignment Evaluation Laboratory** is a specialized research tool designed to address a critical gap in AI safety: the evaluation of Large Language Models (LLMs) in non-English contexts.
+The **Multilingual AI Safety Evaluation Laboratory** is a specialized research tool designed to address a critical gap in AI safety: the evaluation of Large Language Models (LLMs) in non-English contexts.
 
 While most LLM development and testing is English-centric, the majority of the world's population does not speak English. This creates a significant blind spot where models may be less helpful, less accurate, or even more dangerous when used in other languages.
 
@@ -38,11 +38,17 @@ This lab is a critical tool for any organization committed to the safe and ethic
 
 This platform is under active development. Key areas for future expansion include:
 
+### Model-Centric Enhancements
 *   **Advanced Internationalization & Localization Testing:** Moving beyond direct translation to evaluate a model's understanding of cultural nuance, regional dialects, and localized content appropriateness.
 *   **Agentic System Evaluation:** Introducing simulations of multi-turn, task-oriented workflows to evaluate the safety and alignment of AI agents over extended interactions in different languages.
 *   **Structured Red Teaming Integration:** Incorporating modules that allow evaluators to use structured, adversarial prompts to proactively probe for vulnerabilities and "jailbreaks," with a focus on exploits that are language-specific.
 *   **Multi-modal Evaluation:** Expanding the framework to assess the safety and alignment of models that generate images, audio, and video content based on multilingual prompts.
 *   **Enhanced Analytics & Longitudinal Tracking:** Building more sophisticated dashboard visualizations to track model performance and safety drift over time, specifically comparing language-based cohorts.
+
+### Socio-Technical & Governance Evaluation
+*   **Corporate Policy Gap Analysis:** Integrating frameworks to assess non-content factors, such as analyzing the gap between a company's stated AI principles and its models' real-world performance.
+*   **Market Access & Accessibility Analysis:** Adding modules to evaluate the implications of model deployment on market access and the equitable availability of services for diverse communities.
+*   **Contextual Vulnerability Assessment:** Incorporating tools for comprehensive stakeholder mapping and the assessment of country-specific vulnerability factors to provide a holistic view of potential societal impacts.
 
 ## 5. Access Control & Login
 
