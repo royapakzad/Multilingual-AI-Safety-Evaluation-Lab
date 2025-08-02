@@ -6,6 +6,5 @@
  */
 export interface CsvScenario {
   id: number;
-  context: string;
   prompt: string;
 }
