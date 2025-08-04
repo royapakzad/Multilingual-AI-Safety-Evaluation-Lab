@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 
 interface LoginProps {
@@ -65,6 +66,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSubmit, loginError }) => {
       </div>
        <p className="text-center text-xs text-muted-foreground mt-8 max-w-sm">
         For evaluators, please use your email address as both the username and password. For admins, use the provided credentials.
+      </p>
+      <p className="text-center text-xs text-muted-foreground mt-4 max-w-sm">
+        <a href="https://github.com/royapakzad/llm-multilingual-evaluation-lab" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Check out source code from GitHub</a>
       </p>
     </div>
   );
