@@ -11,7 +11,7 @@ This lab's primary purpose is to empower researchers, developers, and policymake
 
 ## 2. Core Capabilities
 
-The platform is built around a primary A/B comparison lab and a powerful meta-evaluation system, all designed with a multilingual focus.
+The platform is built around a comparison lab and a powerful meta-evaluation system, all designed with a multilingual focus.
 
 #### A. Systematic Multilingual Evaluation
 This is the lab's core function. It facilitates the **direct comparison** of an LLM's response to an English prompt versus its response to the same prompt translated into one of dozens of supported languages. This allows for precise measurement of:
@@ -27,26 +27,27 @@ This feature allows for research into the scalability and reliability of AI eval
 
 ## 3. Benefits: Why Multilingual Evaluation Matters for Responsible AI
 
-This lab is a critical tool for any organization committed to the safe and ethical deployment of AI, particularly for public-facing bodies like government agencies.
+This lab is an important tool for any organization committed to the safe and ethical deployment of AI, particularly for public-facing bodies like government agencies and intrenational organizations such as UN.
 
-*   **Exposing Language-Based Disparities & Harms:** Most safety benchmarks are heavily English-centric. This lab provides the tools to uncover hidden risks that only manifest in other languages. Are safety guardrails weaker? Is the model more likely to produce misinformation or biased content in Spanish, Urdu, or Swahili? Answering these questions is fundamental to deploying AI responsibly in a global context.
+*   **Exposing Language-Based Disparities & Harms:** Most safety benchmarks are heavily English-centric. This lab provides the tools to uncover risks that only manifest in other languages. Are safety guardrails weaker? Is the model more likely to produce misinformation or biased content in Spanish, Urdu, or Swahili? Answering these questions is fundamental to deploying AI responsibly in a global context.
 *   **Ensuring Global Equity:** Public services and information access must be equitable for all. This tool allows for the direct assessment of an LLM's utility and safety for minority language speakers, preventing the rollout of systems that are inadvertently discriminatory.
 *   **Evidence for Governance & Procurement:** It provides concrete, qualitative data that goes beyond marketing claims. By providing clear evidence of a model's multilingual capabilities (or lack thereof), agencies can make informed procurement decisions that serve their *entire* constituency, not just English speakers.
 *   **Developing Better, Safer Models:** By identifying *why* a model fails in specific languages, developers can create better fine-tuning strategies, more robust safety systems, and interaction protocols that are safer for a global user base.
 
 ## 4. Future Development Roadmap
 
-This platform is under active development. Key areas for future expansion include:
+This platform is under development. Key areas for future expansion include:
 
 ### Model-Centric Enhancements
-*   **Advanced Internationalization & Localization Testing:** Moving beyond direct translation to evaluate a model's understanding of cultural nuance, regional dialects, and localized content appropriateness.
 *   **Agentic System Evaluation:** Introducing simulations of multi-turn, task-oriented workflows to evaluate the safety and alignment of AI agents over extended interactions in different languages.
 *   **Structured Red Teaming Integration:** Incorporating modules that allow evaluators to use structured, adversarial prompts to proactively probe for vulnerabilities and "jailbreaks," with a focus on exploits that are language-specific.
 *   **Multi-modal Evaluation:** Expanding the framework to assess the safety and alignment of models that generate images, audio, and video content based on multilingual prompts.
 *   **Enhanced Analytics & Longitudinal Tracking:** Building more sophisticated dashboard visualizations to track model performance and safety drift over time, specifically comparing language-based cohorts.
+*   **Advanced Internationalization & Localization Testing:** Moving beyond direct translation to evaluate a model's understanding of contexts, cultural nuance, regional dialects, and localized content appropriateness.
+
 
 ### Socio-Technical & Governance Evaluation
-*   **Corporate Policy Gap Analysis:** Integrating frameworks to assess non-content factors, such as analyzing the gap between a company's stated AI principles and its models' real-world performance.
+*   **Corporate Policy Gap Analysis:** Integrating frameworks to assess non-content factors, such as analyzing the policy development and implementation gap between a company's stated AI principles and its models' real-world performance.
 *   **Market Access & Accessibility Analysis:** Adding modules to evaluate the implications of model deployment on market access and the equitable availability of services for diverse communities.
 *   **Contextual Vulnerability Assessment:** Incorporating tools for comprehensive stakeholder mapping and the assessment of country-specific vulnerability factors to provide a holistic view of potential societal impacts.
 
@@ -65,7 +66,7 @@ The application features a two-level access system:
 
 ## 6. API Key Configuration (Crucial!)
 
-This application requires API keys for Google Gemini, OpenAI, and Mistral models to function fully.
+This application requires API keys for Google Gemini, OpenAI, and Mistral models to function fully (more models to be added).
 
 **For Local Development (Recommended):**
 
