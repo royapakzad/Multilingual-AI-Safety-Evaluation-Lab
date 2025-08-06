@@ -170,6 +170,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
   const [csvScenarios, setCsvScenarios] = useState<CsvScenario[]>([]);
   const [selectedCsvScenarioId, setSelectedCsvScenarioId] = useState<string>('');
   const [csvError, setCsvError] = useState<string | null>(null);
+  const [currentScenarioContext, setCurrentScenarioContext] = useState<string>('');
 
   // Language State
   const [selectedNativeLanguageCode, setSelectedNativeLanguageCode] = useState<string>('');
@@ -231,7 +232,9 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     }
   }, [cooldown]);
 
-  const resetEvaluationState = () => {
+  const resetResponsesAndScores = () => {
+    setRawResponseA(''); setRawResponseB('');
+    setResponseA(null); setResponseB(null);
     setCurrentScoresA({...INITIAL_LANGUAGE_SPECIFIC_RUBRIC_SCORES});
     setCurrentScoresB({...INITIAL_LANGUAGE_SPECIFIC_RUBRIC_SCORES});
     setCurrentHarmDisparityMetrics({...INITIAL_HARM_DISPARITY_METRICS});
@@ -244,12 +247,10 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     setIsManuallyFlaggedForReview(false);
     setReasoningA(null); setReasoningB(null);
   };
-
+  
   const resetForNewRun = () => {
       setEditingEvaluationId(null);
-      setRawResponseA(''); setRawResponseB('');
-      setResponseA(null); setResponseB(null);
-      resetEvaluationState();
+      resetResponsesAndScores();
   };
   
   const handleNativeLanguageSelect = (languageCode: string) => {
@@ -400,6 +401,8 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     
     const langInfo = AVAILABLE_NATIVE_LANGUAGES.find(l => recordToEdit.languagePair.includes(l.name));
     setSelectedNativeLanguageCode(langInfo?.code || '');
+    
+    setCurrentScenarioContext(recordToEdit.scenarioContext || '');
 
     // Setup columns
     setTitleA(recordToEdit.titleA);
@@ -456,6 +459,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
         userEmail: existingRecord?.userEmail || currentUser.email, // Preserve original evaluator email
         labType: 'reasoning',
         scenarioId, scenarioCategory,
+        scenarioContext: currentScenarioContext,
         languagePair: `English - ${langInfo?.name || "N/A"}`,
         model: selectedModel,
         titleA, promptA, reasoningRequestedA: requestReasoningA, rawResponseA, reasoningA, responseA,
@@ -486,6 +490,11 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     alert(isUpdating ? "Evaluation updated successfully!" : "Human evaluation saved! Now getting LLM evaluation in the background...");
     
     resetForNewRun();
+    // Clear custom prompt fields after saving
+    setPromptA('');
+    setPromptB('');
+    setCurrentScenarioContext('');
+    setSelectedCsvScenarioId('');
 
     // Do NOT run LLM evaluation on updates
     if (!isUpdating) {
@@ -567,6 +576,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
       setSelectedCsvScenarioId('');
       setPromptA('');
       setPromptB('');
+      setCurrentScenarioContext('');
       resetForNewRun();
 
       const reader = new FileReader();
@@ -585,9 +595,10 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
           const headerLine = lines[0].trim().split(',');
           const header = headerLine.map(h => h.trim().toLowerCase().replace(/"/g, ''));
           const promptIndex = header.indexOf('prompt');
+          const contextIndex = header.indexOf('context');
 
-          if (promptIndex === -1) {
-              setCsvError("CSV header must contain a 'prompt' column.");
+          if (promptIndex === -1 || contextIndex === -1) {
+              setCsvError("CSV header must contain both 'context' and 'prompt' columns.");
               return;
           }
 
@@ -595,6 +606,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
               const columns = line.split(',');
               return {
                   id: index + 1,
+                  context: columns[contextIndex]?.trim().replace(/^"|"$/g, '') || '',
                   prompt: columns[promptIndex]?.trim().replace(/^"|"$/g, '') || ''
               };
           });
@@ -611,8 +623,8 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     if (inputMode === 'csv' && selectedCsvScenarioId) {
         const scenario = csvScenarios.find(s => s.id === parseInt(selectedCsvScenarioId, 10));
         if (scenario) {
-            const fullPrompt = scenario.prompt;
-            setPromptA(fullPrompt);
+            setPromptA(scenario.prompt);
+            setCurrentScenarioContext(scenario.context);
             resetForNewRun();
         }
     }
@@ -648,7 +660,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
         return { ...rest, ...flatHumanScores, ...flatLlmScores };
     });
 
-    const allHeaders = new Set<string>(['id', 'timestamp', 'userEmail', 'labType', 'scenarioId', 'scenarioCategory', 'languagePair', 'model', 'titleA', 'promptA', 'reasoningRequestedA', 'reasoningWordCountA', 'answerWordCountA', 'generationTimeSecondsA', 'wordsPerSecondA', 'titleB', 'promptB', 'reasoningRequestedB', 'reasoningWordCountB', 'answerWordCountB', 'generationTimeSecondsB', 'wordsPerSecondB', 'notes', 'isFlaggedForReview', 'rawResponseA', 'reasoningA', 'responseA', 'rawResponseB', 'reasoningB', 'responseB', 'llmEvaluationStatus', 'llmEvaluationError']);
+    const allHeaders = new Set<string>(['id', 'timestamp', 'userEmail', 'labType', 'scenarioId', 'scenarioCategory', 'scenarioContext', 'languagePair', 'model', 'titleA', 'promptA', 'reasoningRequestedA', 'reasoningWordCountA', 'answerWordCountA', 'generationTimeSecondsA', 'wordsPerSecondA', 'titleB', 'promptB', 'reasoningRequestedB', 'reasoningWordCountB', 'answerWordCountB', 'generationTimeSecondsB', 'wordsPerSecondB', 'notes', 'isFlaggedForReview', 'rawResponseA', 'reasoningA', 'responseA', 'rawResponseB', 'reasoningB', 'responseB', 'llmEvaluationStatus', 'llmEvaluationError']);
     flattenedData.forEach(row => Object.keys(row).forEach(header => allHeaders.add(header)));
     const headers = Array.from(allHeaders);
     
@@ -679,7 +691,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                         {(['custom', 'csv'] as const).map(mode => (
                             <button
                                 key={mode}
-                                onClick={() => { setInputMode(mode); setPromptA(''); setPromptB(''); setSelectedCsvScenarioId(''); }}
+                                onClick={() => { setInputMode(mode); setPromptA(''); setPromptB(''); setSelectedCsvScenarioId(''); setCurrentScenarioContext(''); }}
                                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${inputMode === mode ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:bg-background/50'}`}
                             >
                                 {mode === 'custom' ? 'Custom Scenario' : 'Upload CSV'}
@@ -699,7 +711,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                     <div className="space-y-3">
                         <div>
                             <label htmlFor="csv-upload" className="block text-sm font-medium text-foreground mb-1">Upload Scenarios CSV</label>
-                            <p className="text-xs text-muted-foreground mb-2">The CSV file must contain a header row with a column named "prompt".</p>
+                            <p className="text-xs text-muted-foreground mb-2">The CSV file must contain a header row with columns named "context" and "prompt".</p>
                             <input type="file" id="csv-upload" accept=".csv" onChange={handleFileChange}
                                 className="form-input w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
                             {csvError && <p className="text-xs text-destructive mt-1">{csvError}</p>}
@@ -801,6 +813,12 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                         </div>
                       </summary>
                       <div className="px-6 py-6 border-t border-border bg-background/50 text-sm space-y-6">
+                        {ev.scenarioContext && (
+                            <div className="mb-4">
+                                <h4 className="font-semibold text-foreground/90 mb-1.5 text-base">Scenario Context:</h4>
+                                <p className="italic text-muted-foreground bg-muted p-3 rounded-md text-xs max-h-32 overflow-y-auto custom-scrollbar" tabIndex={0}>{ev.scenarioContext}</p>
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                             <div><h4 className="font-semibold text-foreground/90 mb-1.5 text-base">{ev.titleA} Prompt:</h4><p className="italic text-muted-foreground bg-muted p-3 rounded-md text-xs max-h-32 overflow-y-auto custom-scrollbar" tabIndex={0}>{ev.promptA}</p></div>
                             <div><h4 className="font-semibold text-foreground/90 mb-1.5 text-base">{ev.titleB} Prompt:</h4><p className="italic text-muted-foreground bg-muted p-3 rounded-md text-xs max-h-32 overflow-y-auto custom-scrollbar" tabIndex={0}>{ev.promptB}</p></div>
@@ -823,15 +841,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                         )}
                         
                         <div className="mt-6 flex justify-between items-center pt-4 border-t border-border/50">
-                            <button
-                                onClick={() => handleDeleteEvaluation(ev.id)}
-                                className="px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 text-destructive hover:bg-destructive/10"
-                                aria-label="Delete this evaluation"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 01-8.832 0v-.227a3 3 0 013-3h2.666a3 3 0 013 3zM3.5 6A1.5 1.5 0 002 7.5v9A1.5 1.5 0 003.5 18h13a1.5 1.5 0 001.5-1.5v-9A1.5 1.5 0 0016.5 6h-13zM8 10a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 10zm4 0a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0112 10z" clipRule="evenodd" /></svg>
-                                <span>Delete Evaluation</span>
-                            </button>
-                            <div className="flex items-center gap-2">
+                             <div className="flex items-center gap-2">
                                 {canEdit && (
                                     <button
                                         onClick={() => handleStartEdit(ev.id)}
@@ -842,6 +852,16 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                                         <span>Edit</span>
                                     </button>
                                 )}
+                                <button
+                                    onClick={() => handleDeleteEvaluation(ev.id)}
+                                    className="px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 text-destructive hover:bg-destructive/10"
+                                    aria-label="Delete this evaluation"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 01-8.832 0v-.227a3 3 0 013-3h2.666a3 3 0 013 3zM3.5 6A1.5 1.5 0 002 7.5v9A1.5 1.5 0 003.5 18h13a1.5 1.5 0 001.5-1.5v-9A1.5 1.5 0 0016.5 6h-13zM8 10a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 10zm4 0a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0112 10z" clipRule="evenodd" /></svg>
+                                    <span>Delete Evaluation</span>
+                                </button>
+                             </div>
+                            <div className="flex items-center gap-2">
                                 <button onClick={() => handleToggleFlagForReview(ev.id)} className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 ${ev.isFlaggedForReview ? 'bg-destructive/80 text-destructive-foreground hover:bg-destructive' : 'bg-secondary text-secondary-foreground hover:bg-muted'}`} aria-label={ev.isFlaggedForReview ? 'Unflag this evaluation' : 'Flag this evaluation for admin review'}>
                                     {ev.isFlaggedForReview ? '🚩 Unflag' : 'Flag for Review'}
                                 </button>
