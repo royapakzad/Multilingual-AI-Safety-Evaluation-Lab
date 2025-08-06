@@ -207,6 +207,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
   const [wordsPerSecondB, setWordsPerSecondB] = useState<number | null>(null);
   
   // Evaluation State
+  const [editingEvaluationId, setEditingEvaluationId] = useState<string | null>(null);
   const [currentScoresA, setCurrentScoresA] = useState<LanguageSpecificRubricScores>({...INITIAL_LANGUAGE_SPECIFIC_RUBRIC_SCORES});
   const [currentScoresB, setCurrentScoresB] = useState<LanguageSpecificRubricScores>({...INITIAL_LANGUAGE_SPECIFIC_RUBRIC_SCORES});
   const [currentHarmDisparityMetrics, setCurrentHarmDisparityMetrics] = useState<HarmDisparityMetrics>({...INITIAL_HARM_DISPARITY_METRICS});
@@ -245,6 +246,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
   };
 
   const resetForNewRun = () => {
+      setEditingEvaluationId(null);
       setRawResponseA(''); setRawResponseB('');
       setResponseA(null); setResponseB(null);
       resetEvaluationState();
@@ -383,19 +385,75 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     }
   };
 
+  const handleStartEdit = (evaluationId: string) => {
+    const recordToEdit = allEvaluations.find(ev => ev.id === evaluationId);
+    if (!recordToEdit) {
+      setError("Could not find the evaluation record to edit.");
+      return;
+    }
+
+    // Set editing state
+    setEditingEvaluationId(recordToEdit.id);
+
+    // Populate all form fields
+    setSelectedModel(recordToEdit.model);
+    
+    const langInfo = AVAILABLE_NATIVE_LANGUAGES.find(l => recordToEdit.languagePair.includes(l.name));
+    setSelectedNativeLanguageCode(langInfo?.code || '');
+
+    // Setup columns
+    setTitleA(recordToEdit.titleA);
+    setPromptA(recordToEdit.promptA);
+    setRequestReasoningA(recordToEdit.reasoningRequestedA);
+    setTitleB(recordToEdit.titleB);
+    setPromptB(recordToEdit.promptB);
+    setRequestReasoningB(recordToEdit.reasoningRequestedB);
+
+    // LLM Responses (raw and parsed)
+    setRawResponseA(recordToEdit.rawResponseA);
+    setResponseA(recordToEdit.responseA);
+    setReasoningA(recordToEdit.reasoningA);
+    setRawResponseB(recordToEdit.rawResponseB);
+    setResponseB(recordToEdit.responseB);
+    setReasoningB(recordToEdit.reasoningB);
+
+    // Performance metrics
+    setGenerationTimeA(recordToEdit.generationTimeSecondsA ?? null);
+    setAnswerWordCountA(recordToEdit.answerWordCountA);
+    setReasoningWordCountA(recordToEdit.reasoningWordCountA);
+    setWordsPerSecondA(recordToEdit.wordsPerSecondA ?? null);
+    setGenerationTimeB(recordToEdit.generationTimeSecondsB ?? null);
+    setAnswerWordCountB(recordToEdit.answerWordCountB);
+    setReasoningWordCountB(recordToEdit.reasoningWordCountB);
+    setWordsPerSecondB(recordToEdit.wordsPerSecondB ?? null);
+    
+    // Evaluation scores and notes
+    setCurrentScoresA(recordToEdit.humanScores.english);
+    setCurrentScoresB(recordToEdit.humanScores.native);
+    setCurrentHarmDisparityMetrics(recordToEdit.humanScores.disparity);
+    setEvaluationNotes(recordToEdit.notes);
+    setIsManuallyFlaggedForReview(recordToEdit.isFlaggedForReview ?? false);
+
+    // Scroll to the top to show the populated forms
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleEvaluationSubmit = async () => {
     if (responseA === null || responseB === null) {
         alert("Responses must be generated before submitting.");
         return;
     }
+    const isUpdating = !!editingEvaluationId;
+    const existingRecord = isUpdating ? allEvaluations.find(ev => ev.id === editingEvaluationId) : undefined;
+    
     const langInfo = AVAILABLE_NATIVE_LANGUAGES.find(l => l.code === selectedNativeLanguageCode);
     const scenarioId = inputMode === 'csv' ? `csv-scenario-${selectedCsvScenarioId}` : 'custom';
     const scenarioCategory = inputMode === 'csv' ? 'CSV Upload' : 'Custom';
     
-    const newRecord: ReasoningEvaluationRecord = {
-        id: `${new Date().toISOString()}-reasoning-${Math.random().toString(16).slice(2)}`,
-        timestamp: new Date().toISOString(),
-        userEmail: currentUser.email,
+    const recordData: ReasoningEvaluationRecord = {
+        id: isUpdating ? editingEvaluationId! : `${new Date().toISOString()}-reasoning-${Math.random().toString(16).slice(2)}`,
+        timestamp: new Date().toISOString(), // Always update timestamp on edit
+        userEmail: existingRecord?.userEmail || currentUser.email, // Preserve original evaluator email
         labType: 'reasoning',
         scenarioId, scenarioCategory,
         languagePair: `English - ${langInfo?.name || "N/A"}`,
@@ -411,33 +469,42 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
         },
         notes: evaluationNotes,
         isFlaggedForReview: isManuallyFlaggedForReview,
-        llmEvaluationStatus: 'pending',
+        llmEvaluationStatus: existingRecord?.llmEvaluationStatus || 'pending',
+        llmScores: existingRecord?.llmScores,
+        llmEvaluationError: existingRecord?.llmEvaluationError,
     };
 
-    // Save immediately with 'pending' status for instant UI feedback
+    // Save logic
     const allCurrentEvals = loadEvaluationsFromStorage();
-    const updatedEvaluations = [...allCurrentEvals.filter(e => e.id !== newRecord.id), newRecord];
+    const updatedEvaluations = isUpdating
+        ? allCurrentEvals.map(ev => (ev.id === editingEvaluationId ? recordData : ev))
+        : [...allCurrentEvals, recordData];
+    
     localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(updatedEvaluations));
     setAllEvaluations(updatedEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
 
-    alert("Human evaluation saved! Now getting LLM evaluation in the background...");
+    alert(isUpdating ? "Evaluation updated successfully!" : "Human evaluation saved! Now getting LLM evaluation in the background...");
+    
     resetForNewRun();
 
-    // Run LLM evaluation in the background
-    try {
-        const llmScores = await evaluateWithLlm(newRecord);
-        const finalEvaluations = loadEvaluationsFromStorage().map(ev => 
-            ev.id === newRecord.id ? { ...ev, llmScores, llmEvaluationStatus: 'completed' } : ev
-        );
-        localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(finalEvaluations));
-        setAllEvaluations(finalEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
-    } catch (err) {
-        console.error("LLM Evaluation Failed:", err);
-        const finalEvaluations = loadEvaluationsFromStorage().map(ev => 
-            ev.id === newRecord.id ? { ...ev, llmEvaluationStatus: 'failed', llmEvaluationError: err instanceof Error ? err.message : String(err) } : ev
-        );
-        localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(finalEvaluations));
-        setAllEvaluations(finalEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
+    // Do NOT run LLM evaluation on updates
+    if (!isUpdating) {
+        // Run LLM evaluation in the background for new records
+        try {
+            const llmScores = await evaluateWithLlm(recordData);
+            const finalEvaluations = loadEvaluationsFromStorage().map(ev => 
+                ev.id === recordData.id ? { ...ev, llmScores, llmEvaluationStatus: 'completed' } : ev
+            );
+            localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(finalEvaluations));
+            setAllEvaluations(finalEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
+        } catch (err) {
+            console.error("LLM Evaluation Failed:", err);
+            const finalEvaluations = loadEvaluationsFromStorage().map(ev => 
+                ev.id === recordData.id ? { ...ev, llmEvaluationStatus: 'failed', llmEvaluationError: err instanceof Error ? err.message : String(err) } : ev
+            );
+            localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(finalEvaluations));
+            setAllEvaluations(finalEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
+        }
     }
   };
   
@@ -692,6 +759,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                     harmDisparityMetrics={currentHarmDisparityMetrics} onHarmDisparityMetricsChange={setCurrentHarmDisparityMetrics}
                     overallNotes={evaluationNotes} onOverallNotesChange={setEvaluationNotes}
                     onSubmit={handleEvaluationSubmit} disabled={isLoading}
+                    isEditing={!!editingEvaluationId}
                     isManuallyFlaggedForReview={isManuallyFlaggedForReview} onIsManuallyFlaggedForReviewChange={setIsManuallyFlaggedForReview}
                     generationTimeEnglish={generationTimeA} generationTimeNative={generationTimeB}
                     wordCountEnglish={answerWordCountA} wordCountNative={answerWordCountB}
@@ -716,7 +784,9 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
           ) : (
              viewMode === 'list' ? (
                 <div className="space-y-8">
-                  {visibleEvaluations.slice().reverse().map((ev) => (
+                  {visibleEvaluations.slice().reverse().map((ev) => {
+                    const canEdit = currentUser.role === 'admin' || currentUser.email === ev.userEmail;
+                    return (
                     <details key={ev.id} className={`bg-card text-card-foreground rounded-xl shadow-md border overflow-hidden transition-all duration-300 ${ev.isFlaggedForReview ? 'border-destructive ring-2 ring-destructive' : 'border-border'}`}>
                       <summary className="px-6 py-5 cursor-pointer list-none flex justify-between items-center hover:bg-muted/60">
                         <div className="flex-grow">
@@ -761,13 +831,25 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 01-8.832 0v-.227a3 3 0 013-3h2.666a3 3 0 013 3zM3.5 6A1.5 1.5 0 002 7.5v9A1.5 1.5 0 003.5 18h13a1.5 1.5 0 001.5-1.5v-9A1.5 1.5 0 0016.5 6h-13zM8 10a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 10zm4 0a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0112 10z" clipRule="evenodd" /></svg>
                                 <span>Delete Evaluation</span>
                             </button>
-                            <button onClick={() => handleToggleFlagForReview(ev.id)} className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 ${ev.isFlaggedForReview ? 'bg-destructive/80 text-destructive-foreground hover:bg-destructive' : 'bg-secondary text-secondary-foreground hover:bg-muted'}`} aria-label={ev.isFlaggedForReview ? 'Unflag this evaluation' : 'Flag this evaluation for admin review'}>
-                                {ev.isFlaggedForReview ? '🚩 Unflag' : 'Flag for Review'}
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {canEdit && (
+                                    <button
+                                        onClick={() => handleStartEdit(ev.id)}
+                                        className="px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 text-primary hover:bg-primary/10"
+                                        aria-label="Edit this evaluation"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg>
+                                        <span>Edit</span>
+                                    </button>
+                                )}
+                                <button onClick={() => handleToggleFlagForReview(ev.id)} className={`px-4 py-2 text-xs font-semibold rounded-lg shadow-sm transition-all duration-200 flex items-center gap-2 ${ev.isFlaggedForReview ? 'bg-destructive/80 text-destructive-foreground hover:bg-destructive' : 'bg-secondary text-secondary-foreground hover:bg-muted'}`} aria-label={ev.isFlaggedForReview ? 'Unflag this evaluation' : 'Flag this evaluation for admin review'}>
+                                    {ev.isFlaggedForReview ? '🚩 Unflag' : 'Flag for Review'}
+                                </button>
+                            </div>
                         </div>
                       </div>
                     </details>
-                  ))}
+                  )})}
                 </div>
             ) : (
                 <ReasoningDashboard evaluations={visibleEvaluations} />
