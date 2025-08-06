@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { LanguageSpecificRubricScores, HarmDisparityMetrics, RubricDimension, VerifiableEntity } from '../types';
 import { 
@@ -217,6 +218,7 @@ interface EvaluationFormProps {
   wordCountNative?: number;
   wordsPerSecondEnglish?: number | null;
   wordsPerSecondNative?: number | null;
+  isEditing?: boolean;
 }
 
 const HarmAssessmentSection: React.FC<{
@@ -325,7 +327,8 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
   wordCountEnglish,
   wordCountNative,
   wordsPerSecondEnglish,
-  wordsPerSecondNative
+  wordsPerSecondNative,
+  isEditing = false,
 }) => {
 
   const handleScoreChange = (setter: Function, currentScores: LanguageSpecificRubricScores) => 
@@ -488,7 +491,7 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
 
       <button type="submit" disabled={disabled}
         className="w-full bg-primary text-primary-foreground font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-primary-hover active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-all duration-200 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none">
-        {disabled ? 'Processing...' : 'Save Evaluation'}
+        {disabled ? 'Processing...' : isEditing ? 'Update Evaluation' : 'Save Evaluation'}
       </button>
     </form>
   );
