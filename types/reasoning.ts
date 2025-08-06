@@ -16,6 +16,7 @@ export interface ReasoningEvaluationRecord {
   // Scenario & Model Info
   scenarioId: string;
   scenarioCategory: string;
+  scenarioContext?: string;
   languagePair: string;
   model: LLMModelType;
   
