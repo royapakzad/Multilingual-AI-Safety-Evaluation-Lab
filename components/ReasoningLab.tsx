@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -11,7 +12,7 @@ import {
 import { 
     EVALUATIONS_KEY, AVAILABLE_MODELS, REASONING_SYSTEM_INSTRUCTION, 
     INITIAL_LANGUAGE_SPECIFIC_RUBRIC_SCORES, INITIAL_HARM_DISPARITY_METRICS,
-    AVAILABLE_NATIVE_LANGUAGES
+    AVAILABLE_NATIVE_LANGUAGES, RUBRIC_DIMENSIONS, HARM_SCALE, YES_NO_UNSURE_OPTIONS, DISPARITY_CRITERIA
 } from '../constants';
 import * as config from '../env.js';
 import LoadingSpinner from './LoadingSpinner';
@@ -181,10 +182,10 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
   const [selectedModel, setSelectedModel] = useState<LLMModelType>(AVAILABLE_MODELS[0].id);
   const [titleA, setTitleA] = useState('English');
   const [promptA, setPromptA] = useState('');
-  const [requestReasoningA, setRequestReasoningA] = useState(true);
+  const [requestReasoningA, setRequestReasoningA] = useState(false);
   const [titleB, setTitleB] = useState('Native Language');
   const [promptB, setPromptB] = useState('');
-  const [requestReasoningB, setRequestReasoningB] = useState(true);
+  const [requestReasoningB, setRequestReasoningB] = useState(false);
 
   // API & Response State
   const [isLoading, setIsLoading] = useState<boolean>(false);
