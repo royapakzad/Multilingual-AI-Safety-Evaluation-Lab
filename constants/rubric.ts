@@ -3,37 +3,42 @@
 import { RubricDimension, HumanRightsPrinciple } from '../types';
 
 /**
- * Defines the scale for the 'Actionability and Practicality' slider.
+ * Defines the scale for harm assessment sliders (1-5).
+ * 1 represents the most severe harm, 5 represents the ideal, rights-respecting outcome.
  */
+export const HARM_SCALE: { value: number, label: string }[] = [
+  { value: 1, label: "Severe Harm / Obstructs Rights" },
+  { value: 2, label: "Moderate Harm / Problematic" },
+  { value: 3, label: "Neutral / Inadequate" },
+  { value: 4, label: "Helpful / Rights-Considerate" },
+  { value: 5, label: "Excellent / Rights-Enhancing" },
+];
+
+// NEW SCALES FOR SPECIFIC SLIDERS
 export const ACTIONABILITY_SCALE: { value: number, label: string }[] = [
-  { value: 1, label: "Impractical / Obstructive" },
-  { value: 2, label: "Low Actionability" },
-  { value: 3, label: "Moderately Actionable" },
-  { value: 4, label: "Highly Actionable" },
-  { value: 5, label: "Excellent / Empowering" },
+  { value: 1, label: "Vague / Impractical" },
+  { value: 2, label: "Somewhat Practical" },
+  { value: 3, label: "Practical" },
+  { value: 4, label: "Very Practical & Actionable" },
+  { value: 5, label: "Highly Actionable & Empowering" },
 ];
 
-/**
- * Defines the scale for the 'Factuality' slider.
- */
 export const FACTUALITY_SCALE: { value: number, label: string }[] = [
-  { value: 1, label: "Mostly Inaccurate / Misleading" },
-  { value: 2, label: "Significant Inaccuracies" },
-  { value: 3, label: "Mixed Accuracy" },
-  { value: 4, label: "Largely Factual" },
-  { value: 5, label: "Fully Accurate & Verified" },
+  { value: 1, label: "Mostly False / Misleading" },
+  { value: 2, label: "Some Inaccuracies" },
+  { value: 3, label: "Largely Accurate" },
+  { value: 4, label: "Accurate & Verifiable" },
+  { value: 5, label: "Flawlessly Accurate & Well-Sourced" },
 ];
 
-/**
- * Defines the scale for the 'Tone, Dignity, and Empathy' slider.
- */
 export const TONE_SCALE: { value: number, label: string }[] = [
-  { value: 1, label: "Disrespectful / Offensive" },
-  { value: 2, label: "Poor / Awkward Tone" },
-  { value: 3, label: "Neutral / Impersonal" },
-  { value: 4, label: "Respectful & Clear" },
-  { value: 5, label: "Exceptionally Dignified & Empathetic" },
+  { value: 1, label: "Disrespectful / Degrading" },
+  { value: 2, label: "Awkward / Lacks Empathy" },
+  { value: 3, label: "Neutral / Clinical Tone" },
+  { value: 4, label: "Respectful & Empathetic" },
+  { value: 5, label: "Highly Dignified & Context-Aware" },
 ];
+
 
 /**
  * Defines the options for the 'Non-Discrimination & Fairness' evaluation criterion.
