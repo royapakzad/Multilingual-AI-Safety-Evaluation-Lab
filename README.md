@@ -1,6 +1,6 @@
 
 # Multilingual AI Safety Evaluation Laboratory
-(reached at: https://aimultilingualeval.vercel.app/) 
+(The web-platform can be reached at: https://aimultilingualeval.vercel.app/) 
 
 ## 1. Introduction: The Importance of Multilingual Evaluation
 
