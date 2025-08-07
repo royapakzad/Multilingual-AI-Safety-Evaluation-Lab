@@ -21,7 +21,7 @@ This is the lab's core function. It facilitates the **direct comparison** of an 
 *   **Safety Guardrail Failure:** Are safety filters weaker or more easily bypassed in non-English interactions?
 
 #### B. Human Rights-Based Evaluation Rubric
-All evaluations are conducted using a rubric derived from the **UN B-Tech Project's GenAI taxonomy of harm**. This is not a generic quality assessment; it is a specialized framework designed to measure the human rights impact of AI-generated content, a methodology that is crucial for assessing harms that may disproportionately affect vulnerable, non-English-speaking communities.
+All evaluations are conducted using a rubric derived from the **[UN B-Tech Project's GenAI taxonomy of harm](https://www.ohchr.org/en/documents/tools-and-resources/taxonomy-generative-ai-human-rights-harms-b-tech-gen-ai-project)**. This is not a generic quality assessment; it is a specialized framework designed to measure the human rights impact of AI-generated content, a methodology that is crucial for assessing harms that may disproportionately affect vulnerable, non-English-speaking communities.
 
 #### C. "LLM as a Judge" Meta-Evaluation
 This feature allows for research into the scalability and reliability of AI evaluation itself. By comparing a human's scores to those of a Gemini-powered "LLM Judge," we can study how well automated systems capture nuanced, language-specific failures, a key challenge in creating globally relevant evaluation standards.
