@@ -3,10 +3,6 @@
 import React, { useState } from 'react';
 import { LanguageSpecificRubricScores, HarmDisparityMetrics, RubricDimension, VerifiableEntity } from '../types';
 import { 
-    HARM_SCALE,
-    NON_DISCRIMINATION_OPTIONS,
-    SAFETY_DIGNITY_OPTIONS,
-    FREEDOM_EXPRESSION_OPTIONS,
     YES_NO_UNSURE_OPTIONS,
     RUBRIC_DIMENSIONS,
     DISPARITY_CRITERIA
