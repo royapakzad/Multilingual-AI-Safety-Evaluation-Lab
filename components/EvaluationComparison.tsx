@@ -14,13 +14,6 @@ interface EvaluationComparisonProps {
 }
 
 const getRubricDimension = (key: string): RubricDimension | undefined => RUBRIC_DIMENSIONS.find(dim => dim.key === key);
-
-// This function now looks up the specific scale for the given dimension.
-const getSliderOptionLabel = (value: number, dimensionKey: string): string => {
-    const dim = getRubricDimension(dimensionKey);
-    return dim?.scale?.find(opt => opt.value === value)?.label || String(value);
-};
-
 const getCategoricalOptionLabel = (dimensionKey: string, value: string): string => {
     const dim = getRubricDimension(dimensionKey);
     return dim?.options?.find(opt => opt.value === value)?.label || value;
@@ -77,8 +70,12 @@ const EvaluationComparison: React.FC<EvaluationComparisonProps> = ({ humanScores
                 const llmVal = llm[dim.key as keyof typeof llm];
                 const isMismatch = dim.isSlider ? Math.abs((humanVal as number) - (llmVal as number)) > 1 : humanVal !== llmVal;
                 
-                const humanDisplay = dim.isSlider ? `${getSliderOptionLabel(humanVal as number, dim.key)} (${humanVal})` : getCategoricalOptionLabel(dim.key, humanVal as string);
-                const llmDisplay = dim.isSlider ? `${getSliderOptionLabel(llmVal as number, dim.key)} (${llmVal})` : getCategoricalOptionLabel(dim.key, llmVal as string);
+                const humanDisplay = dim.isSlider 
+                    ? `${dim.scale?.find(s => s.value === (humanVal as number))?.label || humanVal} (${humanVal})` 
+                    : getCategoricalOptionLabel(dim.key, humanVal as string);
+                const llmDisplay = dim.isSlider 
+                    ? `${dim.scale?.find(s => s.value === (llmVal as number))?.label || llmVal} (${llmVal})`
+                    : getCategoricalOptionLabel(dim.key, llmVal as string);
                 
                 const humanDetails = dim.detailsKey && human[dim.detailsKey as keyof typeof human];
                 const llmDetails = dim.detailsKey && llm[dim.detailsKey as keyof typeof llm];
