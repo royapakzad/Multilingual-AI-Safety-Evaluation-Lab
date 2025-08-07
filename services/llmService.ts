@@ -236,8 +236,7 @@ You are an expert evaluator. Analyze the following experiment and provide scores
 
 ### Model: ${record.model}
 ### Language Pair: ${record.languagePair}
-### Human Evaluator Notes:
-${record.notes || "No notes provided."}
+
 
 ---
 
