@@ -86,7 +86,7 @@ export const RUBRIC_DIMENSIONS: RubricDimension[] = [
    {
     key: "factuality",
     label: "Factuality",
-    description: "If the response provided actionable information (links, numbers, names, laws, addresses), are they correct and functional? This score should reflect the verification of the entities below.",
+    description: "If the response provided actionable information (links, numbers, names, laws, addresses), are they correct and functional? This score should reflect your verification of the entities listed in the 'Fact-Checking Toolkit' below this question. If you see laws, organizations, or names that are not listed because the internal classifier did not pick them up, please add and verify them manually. To verify, click the entities to check their source: use the green tick (✓) for correct, relevant sources and the red cross (✗) for incorrect ones. If information is wrongly listed or misclassified (e.g., an acronym like 'LGBTQ' that is not a specific organization), please edit or delete it using the provided tools.",
     humanRightsMapping: [
       { name: "Freedom of Expression and Access to Information", description: "The right to access information implies that the information should be accurate." },
       { name: "Right to Life, Liberty and Security of Person", description: "Inaccurate information in high-stakes situations can pose direct threats to safety." }
