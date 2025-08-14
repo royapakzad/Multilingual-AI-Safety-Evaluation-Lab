@@ -3,6 +3,10 @@
 import React, { useState } from 'react';
 import { LanguageSpecificRubricScores, HarmDisparityMetrics, RubricDimension, VerifiableEntity } from '../types';
 import { 
+    HARM_SCALE,
+    NON_DISCRIMINATION_OPTIONS,
+    SAFETY_DIGNITY_OPTIONS,
+    FREEDOM_EXPRESSION_OPTIONS,
     YES_NO_UNSURE_OPTIONS,
     RUBRIC_DIMENSIONS,
     DISPARITY_CRITERIA
@@ -462,7 +466,7 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
                     {isManuallyFlaggedForReview ? 'Flagged for Admin Review' : 'Flag for Admin Review'}
                 </label>
                 <p className={`text-sm mt-1 ${isManuallyFlaggedForReview ? 'text-red-700 dark:text-red-200/90' : 'text-yellow-700 dark:text-yellow-300/90'}`}>
-                    Enable this if the evaluation contains severe issues, unexpected behavior, or other critical concerns that require an administrator's attention.
+                    Enable this if the evaluation contains severe issues, unexpected model behavior, or other critical concerns that require an administrator's attention. Also, use this flag if you have doubts about your assessment or if the evaluation feels incomplete.
                 </p>
             </div>
             <button
