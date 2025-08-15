@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -22,7 +23,7 @@ import ReasoningDashboard from './ReasoningDashboard';
 import Tooltip from './Tooltip';
 import { generateLlmResponse, translateText, evaluateWithLlm } from '../services/llmService';
 import { analyzeTextResponse } from '../services/textAnalysisService';
-import { saveEvaluationToStorage, loadEvaluationsFromStorage } from '../services/evaluationService';
+import * as db from '../services/databaseService';
 import EvaluationComparison from './EvaluationComparison';
 
 // --- HELPER COMPONENTS ---
@@ -165,6 +166,7 @@ interface ReasoningLabProps {
 const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
   // View mode state
   const [viewMode, setViewMode] = useState<'list' | 'dashboard'>('list');
+  const [isLoadingEvaluations, setIsLoadingEvaluations] = useState<boolean>(true);
 
   // Input Mode State
   const [inputMode, setInputMode] = useState<'custom' | 'csv'>('custom');
@@ -221,9 +223,14 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
 
   // Initial data load
   useEffect(() => {
-    const allSaved = loadEvaluationsFromStorage();
-    setAllEvaluations(allSaved.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
-  }, []);
+    const fetchEvaluations = async () => {
+      setIsLoadingEvaluations(true);
+      const evaluations = await db.getEvaluations(currentUser);
+      setAllEvaluations(evaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
+      setIsLoadingEvaluations(false);
+    };
+    fetchEvaluations();
+  }, [currentUser]);
 
   // Cooldown timer
   useEffect(() => {
@@ -479,74 +486,77 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
         llmEvaluationError: existingRecord?.llmEvaluationError,
     };
 
-    // Save logic
-    const allCurrentEvals = loadEvaluationsFromStorage();
-    const updatedEvaluations = isUpdating
-        ? allCurrentEvals.map(ev => (ev.id === editingEvaluationId ? recordData : ev))
-        : [...allCurrentEvals, recordData];
-    
-    localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(updatedEvaluations));
-    setAllEvaluations(updatedEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
-
-    alert(isUpdating ? "Evaluation updated successfully!" : "Human evaluation saved! Now getting LLM evaluation in the background...");
-    
-    resetForNewRun();
-    // Clear custom prompt fields after saving
-    setPromptA('');
-    setPromptB('');
-    setCurrentScenarioContext('');
-    setSelectedCsvScenarioId('');
-
-    // Do NOT run LLM evaluation on updates
-    if (!isUpdating) {
-        // Run LLM evaluation in the background for new records
-        try {
-            const llmScores = await evaluateWithLlm(recordData);
-            const finalEvaluations = loadEvaluationsFromStorage().map(ev => 
-                ev.id === recordData.id ? { ...ev, llmScores, llmEvaluationStatus: 'completed' } : ev
-            );
-            localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(finalEvaluations));
-            setAllEvaluations(finalEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
-        } catch (err) {
-            console.error("LLM Evaluation Failed:", err);
-            const finalEvaluations = loadEvaluationsFromStorage().map(ev => 
-                ev.id === recordData.id ? { ...ev, llmEvaluationStatus: 'failed', llmEvaluationError: err instanceof Error ? err.message : String(err) } : ev
-            );
-            localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(finalEvaluations));
-            setAllEvaluations(finalEvaluations.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
-        }
-    }
-  };
-  
-  const handleToggleFlagForReview = (evaluationId: string) => {
-    const updatedEvaluations = allEvaluations.map(ev => {
-        if (ev.id === evaluationId) return { ...ev, isFlaggedForReview: !ev.isFlaggedForReview };
-        return ev;
-    });
-    setAllEvaluations(updatedEvaluations);
+    setIsLoading(true);
     try {
-        const existingData = loadEvaluationsFromStorage();
-        const finalData = existingData.map(ev => updatedEvaluations.find(upd => upd.id === ev.id) || ev);
-        localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(finalData));
-    } catch (e) {
-        console.error("Failed to update flag status in localStorage:", e);
+        if (isUpdating) {
+            await db.updateEvaluation(recordData);
+        } else {
+            await db.addEvaluation(recordData);
+        }
+
+        const updatedEvals = await db.getEvaluations(currentUser);
+        setAllEvaluations(updatedEvals.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
+        
+        alert(isUpdating ? "Evaluation updated successfully!" : "Human evaluation saved! Now getting LLM evaluation in the background...");
+
+        resetForNewRun();
+        setPromptA(''); setPromptB(''); setCurrentScenarioContext(''); setSelectedCsvScenarioId('');
+        
+        if (!isUpdating) {
+            (async () => {
+                let finalRecord = { ...recordData };
+                try {
+                    const llmScores = await evaluateWithLlm(recordData);
+                    finalRecord = { ...finalRecord, llmScores, llmEvaluationStatus: 'completed' };
+                } catch (err) {
+                    console.error("LLM Evaluation Failed:", err);
+                    const errorMsg = err instanceof Error ? err.message : String(err);
+                    finalRecord = { ...finalRecord, llmEvaluationStatus: 'failed', llmEvaluationError: errorMsg };
+                }
+                
+                try {
+                    await db.updateEvaluation(finalRecord);
+                    const finalEvals = await db.getEvaluations(currentUser);
+                    setAllEvaluations(finalEvals.filter(ev => ev.labType === 'reasoning') as ReasoningEvaluationRecord[]);
+                } catch (updateErr) {
+                    console.error("Failed to save LLM evaluation result:", updateErr);
+                }
+            })();
+        }
+
+    } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : "Could not save evaluation.");
+    } finally {
+        setIsLoading(false);
     }
   };
   
-  const handleDeleteEvaluation = (evaluationId: string) => {
+  const handleToggleFlagForReview = async (evaluationId: string) => {
+    const targetEval = allEvaluations.find(ev => ev.id === evaluationId);
+    if (!targetEval) return;
+
+    const updatedRecord = { ...targetEval, isFlaggedForReview: !targetEval.isFlaggedForReview };
+    
+    try {
+        await db.updateEvaluation(updatedRecord);
+        setAllEvaluations(allEvaluations.map(ev => ev.id === evaluationId ? updatedRecord : ev));
+    } catch (e) {
+        setError("Failed to update flag status. Please try again.");
+        console.error("Failed to update flag status in DB:", e);
+    }
+  };
+  
+  const handleDeleteEvaluation = async (evaluationId: string) => {
     if (!window.confirm("Are you sure you want to permanently delete this evaluation? This action cannot be undone.")) {
       return;
     }
-    const updatedReasoningEvaluations = allEvaluations.filter(ev => ev.id !== evaluationId);
-    setAllEvaluations(updatedReasoningEvaluations);
     try {
-      const allStoredEvaluations = loadEvaluationsFromStorage();
-      const evaluationsToKeep = allStoredEvaluations.filter(ev => ev.id !== evaluationId);
-      localStorage.setItem(EVALUATIONS_KEY, JSON.stringify(evaluationsToKeep));
+      await db.deleteEvaluation(evaluationId);
+      setAllEvaluations(allEvaluations.filter(ev => ev.id !== evaluationId));
       alert("Evaluation deleted successfully.");
     } catch (e) {
-      console.error("Failed to delete evaluation from localStorage:", e);
-      alert("Error: Could not delete the evaluation from storage.");
+      setError("Error: Could not delete the evaluation.");
+      console.error("Failed to delete evaluation from DB:", e);
     }
   };
 
@@ -675,7 +685,7 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
     document.body.removeChild(link);
   };
   
-  const visibleEvaluations = currentUser.role === 'admin' ? allEvaluations : allEvaluations.filter(ev => ev.userEmail === currentUser.email);
+  const visibleEvaluations = allEvaluations;
   
   return (
     <div className="space-y-16">
@@ -792,7 +802,9 @@ const ReasoningLab: React.FC<ReasoningLabProps> = ({ currentUser }) => {
                  {visibleEvaluations.length > 0 && <button onClick={downloadCSV} className="bg-primary text-primary-foreground font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-all duration-200 text-sm flex items-center justify-center" aria-label="Download evaluations as CSV"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 mr-2"><path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" /><path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" /></svg>Download Full Report</button>}
              </div>
           </div>
-          {visibleEvaluations.length === 0 ? (
+          {isLoadingEvaluations ? (
+            <div className="text-center py-10"><LoadingSpinner size="lg" /></div>
+          ) : visibleEvaluations.length === 0 ? (
             <div className="text-center py-10 bg-card border border-border rounded-xl shadow-sm"><p className="text-lg text-muted-foreground">No comparison evaluations saved yet.</p></div>
           ) : (
              viewMode === 'list' ? (
